@@ -8,20 +8,24 @@
 ### Host Mode — Hermes + AionUi native, Open WebUI in Docker
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/blundrep7909/Hermes_Setup/main/installers/host.sh | bash
+git clone --depth=1 https://github.com/blundrep7909/Hermes_Setup.git ~/Hermes_Setup && bash ~/Hermes_Setup/installers/host.sh
 ```
 
 **What you get:**
-- **Hermes Agent** — installed in Python venv at `~/.hermes-venv/`, auto-started via systemd
-- **AionUi** — cloned + built at `~/hermes-aionui/`, auto-started via systemd (headless WebUI, no GUI)
+- **Hermes Agent** — installed in Python venv at `~/.hermes-venv/`, auto-started via systemd (or nohup)
+- **AionUi** — cloned + built at `~/hermes-aionui/`, auto-started via systemd (or nohup)
 - **Open WebUI** — single Docker container
 - **ACP agents** run natively → full host access (filesystem, processes, network)
 
 ### Docker Mode — Everything containerized
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/blundrep7909/Hermes_Setup/main/installers/docker.sh | bash
+git clone --depth=1 https://github.com/blundrep7909/Hermes_Setup.git ~/Hermes_Setup && bash ~/Hermes_Setup/installers/docker.sh
 ```
+
+> 📁 The cloned repo at `~/Hermes_Setup/` is used for management commands:
+> `bash ~/Hermes_Setup/scripts/doctor.sh`, `uninstall.sh`, `update.sh`, `backup.sh`.
+> Keep it around — it's only ~200KB.
 
 ## Architecture
 
@@ -69,17 +73,17 @@ Docker:
 
 ## Management
 
-All scripts auto-detect host or docker mode from `~/.hermes-setup/state`.
+All commands below run from the cloned repo directory (`~/Hermes_Setup/`). Auto-detect host or docker mode from `~/.hermes-setup/state`.
 
 ### Update
 
 ```bash
 # Auto-detect mode
-bash scripts/update.sh
+bash ~/Hermes_Setup/scripts/update.sh
 
 # Force specific mode
-bash scripts/update.sh --host
-bash scripts/update.sh --docker
+bash ~/Hermes_Setup/scripts/update.sh --host
+bash ~/Hermes_Setup/scripts/update.sh --docker
 ```
 
 | Mode | Hermes | AionUi | Open WebUI |
@@ -91,10 +95,10 @@ bash scripts/update.sh --docker
 
 ```bash
 # Auto-detect mode — backs up to ~/hermes-backups/
-bash scripts/backup.sh [--host | --docker]
+bash ~/Hermes_Setup/scripts/backup.sh [--host | --docker]
 
 # Custom output directory
-BACKUP_DIR=/path/to/backups bash scripts/backup.sh
+BACKUP_DIR=/path/to/backups bash ~/Hermes_Setup/scripts/backup.sh
 ```
 
 | Backup source | Host mode | Docker mode |
@@ -110,10 +114,10 @@ BACKUP_DIR=/path/to/backups bash scripts/backup.sh
 
 ```bash
 # Interactive (asks confirmation, preserves data by default)
-bash scripts/uninstall.sh [--host | --docker]
+bash ~/Hermes_Setup/scripts/uninstall.sh [--host | --docker]
 
 # Delete everything without asking
-bash scripts/uninstall.sh --force
+bash ~/Hermes_Setup/scripts/uninstall.sh --force
 ```
 
 | What gets removed | Without `--force` | With `--force` |
@@ -129,17 +133,17 @@ bash scripts/uninstall.sh --force
 
 ```bash
 # Host mode
-systemctl --user status hermes-gateway      # Check Hermes
-systemctl --user status aionui-webui        # Check AionUi
-journalctl --user -u hermes-gateway -f      # Hermes logs
-journalctl --user -u aionui-webui -f        # AionUi logs
+systemctl --user status hermes-gateway      # Check Hermes (or nohup)
+systemctl --user status aionui-webui        # Check AionUi (or nohup)
+journalctl --user -u hermes-gateway -f      # Hermes logs (systemd only)
+journalctl --user -u aionui-webui -f        # AionUi logs (systemd only)
 docker logs -f open-webui                   # Open WebUI logs
 
 # Docker mode
-docker compose -f compose/docker-compose.yml logs -f
+docker compose -f ~/Hermes_Setup/compose/docker-compose.yml logs -f
 
 # Verify installation
-bash scripts/doctor.sh
+bash ~/Hermes_Setup/scripts/doctor.sh
 ```
 
 ## Data Safety
