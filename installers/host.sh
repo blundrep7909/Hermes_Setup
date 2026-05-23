@@ -305,6 +305,16 @@ else
     "$OPENWEBUI_IMAGE"
 fi
 
+# ─── Wait for Open WebUI health ───────────────────────────────────────
+info "Waiting for Open WebUI to be ready..."
+for i in $(seq 1 12); do
+  if curl -sf http://localhost:3000/health >/dev/null 2>&1; then
+    info "Open WebUI ready (attempt $i)"
+    break
+  fi
+  sleep 5
+done
+
 # ─── Verification ─────────────────────────────────────────────────────
 rollback_step "verify"
 info "Running post-install verification..."

@@ -59,6 +59,16 @@ $DC -f "$COMPOSE_DIR/docker-compose.yml" up -d
 
 # ─── Verification ─────────────────────────────────────────────────────
 rollback_step "verify"
+info "Waiting for services to be ready..."
+for i in $(seq 1 12); do
+  if curl -sf http://localhost:3000/health >/dev/null 2>&1 && \
+     curl -skf -H "Authorization: Bearer $API_SERVER_KEY" http://localhost:8642/v1/models >/dev/null 2>&1; then
+    info "Services ready (attempt $i)"
+    break
+  fi
+  sleep 5
+done
+
 info "Running post-install verification..."
 export API_SERVER_KEY
 bash "$DOCTOR_SCRIPT" || {
