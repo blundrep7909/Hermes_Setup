@@ -106,6 +106,13 @@ check_docker() {
   info "Docker $(docker --version | cut -d' ' -f3 | tr -d ',')"
   info "Compose $(docker compose version | cut -d' ' -f4)"
 
+  # Check daemon is actually running
+  if ! docker info &>/dev/null; then
+    error "Docker daemon is not running."
+    error "  Start Docker: sudo systemctl start docker  (or launch Docker Desktop)"
+    exit 1
+  fi
+
   # Check if host-gateway is supported (Docker >= 20.10)
   if ! docker info --format '{{.ServerVersion}}' 2>/dev/null | grep -q '^2[0-9]\.'; then
     warn "Docker < 20.10 detected — host.docker.internal may not resolve automatically"
