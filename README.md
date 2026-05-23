@@ -67,9 +67,9 @@ Docker:
 
 | Service | Port | URL | Host mode | Docker mode |
 |---------|------|-----|-----------|-------------|
-| Hermes API | 8642 | http://localhost:8642/v1 | Native (systemd) | Container |
+| Hermes API | 8642 | http://localhost:8642/v1 | Native (systemd or nohup) | Container |
 | Open WebUI | 3000 | http://localhost:3000 | Docker (single) | Container |
-| AionUi WebUI | 3001 | http://localhost:3001 | Native (systemd) | Container |
+| AionUi WebUI | 3001 | http://localhost:3001 | Native (systemd or nohup) | Container |
 
 ## Management
 

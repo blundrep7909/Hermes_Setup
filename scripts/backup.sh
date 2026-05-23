@@ -96,7 +96,7 @@ echo "  Contents:"
 ls -lh "$BACKUP_PATH" | awk '{print "    " $NF " (" $5 ")"}'
 echo ""
 echo "  To restore:"
-echo "    1. Reinstall: bash installers/$MODE.sh"
+echo "    1. Reinstall: bash ~/Hermes_Setup/installers/$MODE.sh"
 echo "    2. Extract archives: tar xzf ... -C ~"
 echo "    3. Restore Docker volumes as needed"
 echo ""

@@ -282,10 +282,6 @@ rollback_cleanup() {
           warn "Rolling back: removing config files"
           rm -f "$HERMES_ENV" "$HERMES_CONFIG" 2>/dev/null || true
           ;;
-        "pip_install")
-          warn "Rolling back: removing Hermes venv"
-          rm -rf "$HOME/.hermes-venv" 2>/dev/null || true
-          ;;
       esac
     done < "$STATE_FILE"
     rm -f "$STATE_FILE"

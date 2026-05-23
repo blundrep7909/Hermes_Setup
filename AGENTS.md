@@ -28,4 +28,4 @@ Bearer auth header.
 - Do NOT use named volumes for Hermes config (use bind mount)
 
 ## Verification
-Always run `scripts/doctor.sh` after install to validate all endpoints.
+Always run `~/Hermes_Setup/scripts/doctor.sh` after install to validate all endpoints.
