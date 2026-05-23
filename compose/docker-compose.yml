@@ -1,0 +1,63 @@
+services:
+  hermes:
+    image: ghcr.io/anomalyco/hermes-agent:0.14.11
+    container_name: hermes
+    restart: unless-stopped
+    ports:
+      - "8642:8642"
+    volumes:
+      - ~/.hermes:/opt/data
+    environment:
+      - API_SERVER_ENABLED=true
+      - API_SERVER_KEY=${API_SERVER_KEY}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -skf -H 'Authorization: Bearer $API_SERVER_KEY' http://localhost:8642/v1/models >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:0.9.17
+    container_name: open-webui
+    restart: unless-stopped
+    ports:
+      - "3000:8080"
+    volumes:
+      - open-webui-data:/app/backend/data
+    environment:
+      - OPENAI_API_BASE_URL=http://hermes:8642/v1
+      - OPENAI_API_KEY=${API_SERVER_KEY}
+      - BYPASS_MODEL_ACCESS_CONTROL=true
+      - AIOHTTP_CLIENT_TIMEOUT=120
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  aionui:
+    build:
+      context: ./docker
+      dockerfile: aionui.Dockerfile
+    container_name: aionui
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    volumes:
+      - aionui-data:/data
+      - ~/.hermes:/opt/data:ro
+    depends_on:
+      hermes:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 2 bash -c 'echo > /dev/tcp/localhost/3001' || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  open-webui-data:
+  aionui-data:

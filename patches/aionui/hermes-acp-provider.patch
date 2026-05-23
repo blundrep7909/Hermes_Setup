@@ -1,0 +1,32 @@
+# Hermes ACP Provider – AionUi Configuration Reference
+#
+# This patch documents how Hermes is configured as an ACP backend in AionUi.
+# In production, this is handled automatically by:
+#   1. Pre-installing hermes-agent[acp] (puts `hermes` CLI on PATH)
+#   2. AionUi auto-detecting `hermes` via `command -v hermes`
+#   3. ACP_BACKENDS_ALL environment variable
+#
+# No manual patching is required. This file is for reference only.
+
+# --- AionUi config injection (file-based, written at startup) ---
+# AionUi reads config from /data/config/aionui-config.txt (base64 JSON)
+#
+# Equivalent config for manual setup:
+#
+# ACP_BACKENDS_ALL=hermes
+#
+# Or in aionui-config.txt (base64 of):
+# {
+#   "acp": {
+#     "backends": {
+#       "hermes": {
+#         "name": "Hermes",
+#         "cliCommand": "hermes",
+#         "acpArgs": ["acp"],
+#         "env": {
+#           "ACP_BACKENDS_ALL": "hermes"
+#         }
+#       }
+#     }
+#   }
+# }
