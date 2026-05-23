@@ -52,12 +52,12 @@ store_mode "docker"
 # ─── Deploy Containers ────────────────────────────────────────────────
 rollback_step "compose_build"
 info "Building AionUi Docker image (custom, with hermes-agent[acp])..."
-docker compose -f "$COMPOSE_DIR/docker-compose.yml" build aionui
+$DC -f "$COMPOSE_DIR/docker-compose.yml" build aionui
 
 rollback_step "compose_up"
 info "Starting all containers (Hermes + Open WebUI + AionUi)..."
 export API_SERVER_KEY
-docker compose -f "$COMPOSE_DIR/docker-compose.yml" up -d
+$DC -f "$COMPOSE_DIR/docker-compose.yml" up -d
 
 # ─── Verification ─────────────────────────────────────────────────────
 rollback_step "verify"

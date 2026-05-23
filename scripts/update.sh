@@ -62,11 +62,13 @@ if [[ "$MODE" == "host" ]]; then
       if [[ -x "$b" ]]; then BUN_BIN="$b"; break; fi
     done
     if [[ -n "$BUN_BIN" ]]; then
+      export PATH="$HOME/.bun/bin:$PATH"
       info "Updating AionUi source..."
       git -C "$AIONUI_DIR" pull --ff-only 2>/dev/null || warn "git pull failed, skipping AionUi update"
       info "Rebuilding AionUi..."
       "$BUN_BIN" install --cwd "$AIONUI_DIR"
-      "$BUN_BIN" run --cwd "$AIONUI_DIR" build
+      "$BUN_BIN" run --cwd "$AIONUI_DIR" build:renderer:web
+      "$BUN_BIN" run --cwd "$AIONUI_DIR" build:server
 
       if systemctl --user is-active aionui-webui &>/dev/null 2>&1; then
         info "Restarting AionUi..."
@@ -86,7 +88,7 @@ if [[ "$MODE" == "host" ]]; then
 
   # ─── Open WebUI (Docker) ─────────────────────────────────────────────
   info "Pulling latest Open WebUI image..."
-  docker pull ghcr.io/open-webui/open-webui:0.9.17
+  docker pull ghcr.io/open-webui/open-webui:latest
   if docker ps --format '{{.Names}}' | grep -q '^open-webui$'; then
     info "Recreating Open WebUI container..."
     docker stop open-webui && docker rm open-webui
@@ -100,7 +102,7 @@ if [[ "$MODE" == "host" ]]; then
       -e "OPENAI_API_KEY=$(grep '^API_SERVER_KEY=' "$HOME/.hermes/.env" 2>/dev/null | head -1 | cut -d= -f2 || echo '')" \
       -e BYPASS_MODEL_ACCESS_CONTROL=true \
       -e AIOHTTP_CLIENT_TIMEOUT=120 \
-      ghcr.io/open-webui/open-webui:0.9.17
+      ghcr.io/open-webui/open-webui:latest
   fi
 else
   # ─── Docker Mode ─────────────────────────────────────────────────────

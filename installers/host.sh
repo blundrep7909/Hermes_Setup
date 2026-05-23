@@ -139,6 +139,9 @@ for b in "$HOME/.bun/bin/bun" "/usr/local/bin/bun" "/opt/homebrew/bin/bun" "$(co
 done
 [[ -z "$BUN_BIN" ]] && BUN_BIN="$HOME/.bun/bin/bun"
 
+# Ensure bun bin dir is on PATH (needed for bunx, etc.)
+export PATH="$HOME/.bun/bin:$PATH"
+
 if [[ -d "$AIONUI_DIR" ]]; then
   info "AionUi directory exists at $AIONUI_DIR"
   if [[ ! -f "$AIONUI_DIR/node_modules/.package-lock.json" ]]; then
@@ -150,8 +153,10 @@ else
   git clone --depth=1 https://github.com/iOfficeAI/AionUi.git "$AIONUI_DIR"
   info "Installing dependencies (this may take a minute)..."
   "$BUN_BIN" install --cwd "$AIONUI_DIR"
-  info "Building AionUi (this may take a minute)..."
-  "$BUN_BIN" run --cwd "$AIONUI_DIR" build
+  info "Building AionUi web renderer..."
+  "$BUN_BIN" run --cwd "$AIONUI_DIR" build:renderer:web
+  info "Building AionUi server..."
+  "$BUN_BIN" run --cwd "$AIONUI_DIR" build:server
 fi
 
 # ─── Create Start Scripts (fix #8: --replace, fix #19: dynamic bun) ──
@@ -167,12 +172,13 @@ chmod +x "$SETUP_DIR/hermes-start.sh"
 
 cat > "$SETUP_DIR/aionui-start.sh" << AIONUI_START_EOF
 #!/usr/bin/env bash
+export PATH="\$HOME/.bun/bin:\$PATH"
 BUN_BIN=""
-for b in "$HOME/.bun/bin/bun" "/usr/local/bin/bun" "/opt/homebrew/bin/bun"; do
+for b in "\$HOME/.bun/bin/bun" "/usr/local/bin/bun" "/opt/homebrew/bin/bun"; do
   [[ -x "\$b" ]] && { BUN_BIN="\$b"; break; }
 done
 [[ -z "\$BUN_BIN" ]] && BUN_BIN="\$HOME/.bun/bin/bun"
-cd "\$HOME/hermes-aionui" && exec "\$BUN_BIN" run start --webui --port 3001
+cd "\$HOME/hermes-aionui" && exec "\$BUN_BIN" run server:start:prod
 AIONUI_START_EOF
 chmod +x "$SETUP_DIR/aionui-start.sh"
 
@@ -272,12 +278,12 @@ if [[ "$WSL" == "wsl2" ]]; then
   OPENWEBUI_URL="http://${WSL2_IP:-host.docker.internal}:8642/v1"
 fi
 
-if docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^open-webui$'; then
+if $D ps --format '{{.Names}}' 2>/dev/null | grep -q '^open-webui$'; then
   info "Open WebUI container already running"
 else
-  docker rm -f open-webui 2>/dev/null || true
+  $D rm -f open-webui 2>/dev/null || true
   info "Starting Open WebUI container..."
-  docker run -d \
+  $D run -d \
     --name open-webui \
     --restart unless-stopped \
     -p 3000:8080 \
