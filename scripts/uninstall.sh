@@ -19,6 +19,22 @@ if [[ -z "${HOME:-}" || "$HOME" == "/" ]]; then
   exit 1
 fi
 
+# ─── Docker Permission Setup (same as installer) ─────────────────────────
+D="docker"
+DC="docker compose"
+check_docker_uninstall() {
+  if command -v docker &>/dev/null; then
+    if ! docker info &>/dev/null 2>&1; then
+      local user="$(whoami)"
+      if sudo -u "$user" docker info &>/dev/null 2>&1; then
+        D="sudo -u $user docker"
+        DC="sudo -u $user docker compose"
+      fi
+    fi
+  fi
+}
+check_docker_uninstall || true
+
 read_mode() {
   grep "^mode:" "$STATE_FILE" 2>/dev/null | cut -d: -f2
 }
@@ -102,8 +118,8 @@ if [[ "$MODE" == "host" ]]; then
   done
 else
   header "Stopping containers"
-  if docker compose -f "$COMPOSE_FILE" ps --services --filter "status=running" 2>/dev/null | grep -q .; then
-    docker compose -f "$COMPOSE_FILE" down --remove-orphans
+  if $DC -f "$COMPOSE_FILE" ps --services --filter "status=running" 2>/dev/null | grep -q .; then
+    $DC -f "$COMPOSE_FILE" down --remove-orphans
     info "Containers stopped and removed."
   else
     info "No running containers found."
@@ -111,9 +127,9 @@ else
 fi
 
 # ─── Remove Open WebUI container (both modes) ──────────────────────
-if docker ps -a --format '{{.Names}}' | grep -q '^open-webui$' 2>/dev/null; then
-  docker stop open-webui 2>/dev/null || true
-  docker rm open-webui 2>/dev/null || true
+if $D ps -a --format '{{.Names}}' | grep -q '^open-webui$' 2>/dev/null; then
+  $D stop open-webui 2>/dev/null || true
+  $D rm open-webui 2>/dev/null || true
   info "Open WebUI container removed."
 fi
 
@@ -122,16 +138,16 @@ if [[ "$DELETE_DATA" == "true" ]]; then
   header "Removing data"
 
   for vol in open-webui-data aionui-data; do
-    if docker volume inspect "$vol" &>/dev/null 2>&1; then
-      docker volume rm "$vol"
+    if $D volume inspect "$vol" &>/dev/null 2>&1; then
+      $D volume rm "$vol" >/dev/null 2>&1 || true
       info "Docker volume $vol removed."
     fi
   done
 
   # Remove Docker images
-  docker rmi ghcr.io/anomalyco/hermes-agent:0.14.11 2>/dev/null || true
-  docker rmi ghcr.io/open-webui/open-webui:latest 2>/dev/null || true
-  docker rmi hermes-setup-aionui 2>/dev/null || true
+  $D rmi ghcr.io/anomalyco/hermes-agent:0.14.11 2>/dev/null || true
+  $D rmi ghcr.io/open-webui/open-webui:latest 2>/dev/null || true
+  $D rmi hermes-setup-aionui 2>/dev/null || true
 
   # Hermes config
   if [[ -d "$HOME/.hermes" ]]; then
@@ -210,7 +226,7 @@ check_residue "$HOME/.config/AionUi" "AionUi runtime data"
 check_residue "$HOME/.config/systemd/user/hermes-gateway.service" "Systemd unit (hermes)"
 check_residue "$HOME/.config/systemd/user/aionui-webui.service" "Systemd unit (aionui)"
 
-if docker ps -a --format '{{.Names}}' | grep -q '^open-webui$' 2>/dev/null; then
+if $D ps -a --format '{{.Names}}' | grep -q '^open-webui$' 2>/dev/null; then
   warn "  LEFTOVER: Open WebUI container"
   RESIDUE=true
 fi
