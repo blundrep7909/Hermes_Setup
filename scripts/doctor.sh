@@ -15,10 +15,10 @@ check() {
   local desc="$1" status="$2"
   if [[ "$status" == "ok" ]]; then
     green "  ✓ $desc"
-    ((PASS++))
+    ((++PASS))
   else
     red "  ✗ $desc: $3"
-    ((FAIL++))
+    ((++FAIL))
   fi
 }
 
@@ -88,7 +88,7 @@ OW_UP=$(curl -sf http://localhost:3000/health 2>&1) && {
 echo ""
 echo "--- AionUi ---"
 if [[ "$MODE" == "host" ]]; then
-  if pgrep -f 'bun.*start.*webui' &>/dev/null || pgrep -f 'aionui' &>/dev/null; then
+  if pgrep -f 'bun.*server:start' &>/dev/null || pgrep -f 'aionui' &>/dev/null; then
     check "AionUi process" "ok"
   else
     check "AionUi process" "fail" "not running"
