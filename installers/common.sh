@@ -62,6 +62,23 @@ detect_wsl() {
   fi
 }
 
+# ─── Systemd Detection ────────────────────────────────────────────────
+SYSTEMD_AVAILABLE=false
+
+check_systemd() {
+  if ! command -v systemctl &>/dev/null; then
+    warn "systemctl not found — systemd not available"
+    return 1
+  fi
+  if ! systemctl --user list-units --quiet &>/dev/null 2>&1; then
+    warn "Systemd user instance not running"
+    warn "  Installer will use nohup fallback instead of systemd services"
+    return 1
+  fi
+  SYSTEMD_AVAILABLE=true
+  info "Systemd user instance detected — using systemd services"
+}
+
 # ─── Privilege Escalation ─────────────────────────────────────────────
 sudo_check() {
   if [[ $EUID -ne 0 ]]; then
@@ -236,7 +253,21 @@ rollback_cleanup() {
           warn "Rolling back: removing AionUi build"
           rm -rf "$HOME/hermes-aionui" 2>/dev/null || true
           ;;
+        "nohup_start")
+          warn "Rolling back: killing nohup processes"
+          if [[ -f "$HOME/.hermes-setup/pids/hermes-gateway.pid" ]]; then
+            kill "$(cat "$HOME/.hermes-setup/pids/hermes-gateway.pid")" 2>/dev/null || true
+          fi
+          if [[ -f "$HOME/.hermes-setup/pids/aionui-webui.pid" ]]; then
+            kill "$(cat "$HOME/.hermes-setup/pids/aionui-webui.pid")" 2>/dev/null || true
+          fi
+          rm -rf "$HOME/.hermes-setup/pids" 2>/dev/null || true
+          ;;
         "venv_created")
+          warn "Rolling back: removing Hermes venv"
+          rm -rf "$HOME/.hermes-venv" 2>/dev/null || true
+          ;;
+        "pip_install")
           warn "Rolling back: removing Hermes venv"
           rm -rf "$HOME/.hermes-venv" 2>/dev/null || true
           ;;

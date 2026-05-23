@@ -44,6 +44,11 @@ if [[ "$MODE" == "host" ]]; then
     if systemctl --user is-active hermes-gateway &>/dev/null 2>&1; then
       info "Restarting Hermes gateway..."
       systemctl --user restart hermes-gateway
+    elif [[ -f "$SETUP_DIR/pids/hermes-gateway.pid" ]]; then
+      info "Restarting Hermes gateway (nohup)..."
+      kill "$(cat "$SETUP_DIR/pids/hermes-gateway.pid")" 2>/dev/null || true
+      nohup "$SETUP_DIR/hermes-start.sh" > "$HOME/.hermes/hermes-gateway.log" 2>&1 &
+      echo $! > "$SETUP_DIR/pids/hermes-gateway.pid"
     fi
   else
     warn "Hermes venv not found at ~/.hermes-venv — skipping Hermes update"
@@ -66,6 +71,11 @@ if [[ "$MODE" == "host" ]]; then
       if systemctl --user is-active aionui-webui &>/dev/null 2>&1; then
         info "Restarting AionUi..."
         systemctl --user restart aionui-webui
+      elif [[ -f "$SETUP_DIR/pids/aionui-webui.pid" ]]; then
+        info "Restarting AionUi (nohup)..."
+        kill "$(cat "$SETUP_DIR/pids/aionui-webui.pid")" 2>/dev/null || true
+        nohup "$SETUP_DIR/aionui-start.sh" > "$HOME/hermes-aionui/aionui-webui.log" 2>&1 &
+        echo $! > "$SETUP_DIR/pids/aionui-webui.pid"
       fi
     else
       warn "bun not found — skipping AionUi update"

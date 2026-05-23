@@ -67,8 +67,11 @@ fi
 if [[ "$MODE" == "host" ]]; then
   if systemctl --user is-active hermes-gateway &>/dev/null 2>&1; then
     check "Hermes systemd service" "ok"
+  elif [[ -f "$SETUP_DIR/pids/hermes-gateway.pid" ]] && \
+       kill -0 "$(cat "$SETUP_DIR/pids/hermes-gateway.pid")" 2>/dev/null; then
+    echo "    Hermes gateway running (nohup, PID $(cat "$SETUP_DIR/pids/hermes-gateway.pid"))"
   else
-    check "Hermes systemd service" "fail" "not running"
+    check "Hermes gateway" "fail" "not running"
   fi
 fi
 

@@ -13,17 +13,18 @@ validate_home
 header "Pre-Install Plan — What will be installed on YOUR system"
 echo ""
 echo "  SYSTEM-LEVEL (requires sudo once):"
-echo "    • /var/lib/systemd/linger/$(whoami)  — enables user services after logout"
+echo "    • /var/lib/systemd/linger/$(whoami)  — enables user services after logout (if systemd available)"
 echo "    • Docker image (1 pull)"
 echo ""
 echo "  USER-LEVEL (in \$HOME — fully reversible):"
 echo "    • ~/.hermes-venv/          Python venv with hermes-agent[acp] (~200MB)"
 echo "    • ~/hermes-aionui/         AionUi git clone + bun build (~500MB)"
 echo "    • ~/.hermes/               Hermes config (~10KB)"
-echo "    • ~/.hermes-setup/         Installer metadata (~10KB)"
+echo "    • ~/.hermes-setup/         Installer metadata + PID files (~10KB)"
 echo "    • ~/.bun/                  Bun runtime if not already installed (~300MB)"
 echo "    • ~/.local/bin/hermes      Symlink to hermes CLI"
-echo "    • ~/.config/systemd/user/  2 systemd service files"
+echo "    • ~/.config/systemd/user/  2 systemd service files (if systemd available)"
+echo "    • ~/hermes-setup/pids/     PID files for nohup fallback (if systemd unavailable)"
 echo "    • ~/.bashrc / .zshrc       3 lines (PATH + env sourcing)"
 echo "    • Docker volume            1 (open-webui-data)"
 echo ""
@@ -52,6 +53,9 @@ fi
 
 check_disk_space 3500
 check_docker
+
+rollback_step "systemd_check"
+check_systemd
 
 rollback_step "port_check"
 port_check 8642 "Hermes API" || exit 1
@@ -164,12 +168,14 @@ cd "\$HOME/hermes-aionui" && exec "\$BUN_BIN" run start --webui --port 3001
 AIONUI_START_EOF
 chmod +x "$SETUP_DIR/aionui-start.sh"
 
-# ─── Systemd User Services (fix #2: use wrapper script) ──────────────
-rollback_step "systemd_hermes"
-SYSTEMD_USER_DIR="$HOME/.config/systemd/user"
-mkdir -p "$SYSTEMD_USER_DIR"
+# ─── Systemd User Services / Nohup Fallback ─────────────────────────
+if [[ "$SYSTEMD_AVAILABLE" == "true" ]]; then
+  # ── Systemd Path ────────────────────────────────────────────────────
+  rollback_step "systemd_hermes"
+  SYSTEMD_USER_DIR="$HOME/.config/systemd/user"
+  mkdir -p "$SYSTEMD_USER_DIR"
 
-cat > "$SYSTEMD_USER_DIR/hermes-gateway.service" << 'SERVICE_HERMES_EOF'
+  cat > "$SYSTEMD_USER_DIR/hermes-gateway.service" << 'SERVICE_HERMES_EOF'
 [Unit]
 Description=Hermes Agent Gateway (API Server + ACP)
 After=network.target
@@ -185,8 +191,8 @@ RestartSec=10
 WantedBy=default.target
 SERVICE_HERMES_EOF
 
-rollback_step "systemd_aionui"
-cat > "$SYSTEMD_USER_DIR/aionui-webui.service" << 'SERVICE_AIONUI_EOF'
+  rollback_step "systemd_aionui"
+  cat > "$SYSTEMD_USER_DIR/aionui-webui.service" << 'SERVICE_AIONUI_EOF'
 [Unit]
 Description=AionUi WebUI (Headless)
 After=network.target hermes-gateway.service
@@ -202,22 +208,38 @@ RestartSec=10
 WantedBy=default.target
 SERVICE_AIONUI_EOF
 
-# Enable lingering for this user (fix #17: track step for rollback)
-rollback_step "linger_enabled"
-sudo loginctl enable-linger "$(whoami)" 2>/dev/null || true
+  rollback_step "linger_enabled"
+  sudo loginctl enable-linger "$(whoami)" 2>/dev/null || true
 
-systemctl --user daemon-reload
-info "Starting Hermes gateway..."
-systemctl --user enable --now hermes-gateway.service || {
-  warn "systemd user service failed — starting directly as fallback"
+  systemctl --user daemon-reload
+  info "Starting Hermes gateway (systemd)..."
+  systemctl --user enable --now hermes-gateway.service || {
+    warn "systemd hermes-gateway failed — falling back to nohup"
+    SYSTEMD_AVAILABLE=false
+    nohup "$SETUP_DIR/hermes-start.sh" > "$HOME/.hermes/hermes-gateway.log" 2>&1 &
+    echo $! > "$SETUP_DIR/pids/hermes-gateway.pid"
+  }
+
+  info "Starting AionUi WebUI (systemd)..."
+  systemctl --user enable --now aionui-webui.service 2>/dev/null || {
+    warn "systemd aionui-webui failed — falling back to nohup"
+    SYSTEMD_AVAILABLE=false
+    nohup "$SETUP_DIR/aionui-start.sh" > "$HOME/hermes-aionui/aionui-webui.log" 2>&1 &
+    echo $! > "$SETUP_DIR/pids/aionui-webui.pid"
+  }
+else
+  # ── Nohup Path ─────────────────────────────────────────────────────
+  rollback_step "nohup_start"
+  mkdir -p "$SETUP_DIR/pids"
+
+  info "Systemd not available — starting Hermes via nohup..."
   nohup "$SETUP_DIR/hermes-start.sh" > "$HOME/.hermes/hermes-gateway.log" 2>&1 &
-}
+  echo $! > "$SETUP_DIR/pids/hermes-gateway.pid"
 
-info "Starting AionUi WebUI..."
-systemctl --user enable --now aionui-webui.service 2>/dev/null || {
-  warn "systemd user service failed — starting directly as fallback"
+  info "Systemd not available — starting AionUi via nohup..."
   nohup "$SETUP_DIR/aionui-start.sh" > "$HOME/hermes-aionui/aionui-webui.log" 2>&1 &
-}
+  echo $! > "$SETUP_DIR/pids/aionui-webui.pid"
+fi
 
 # Wait for Hermes API
 info "Waiting for Hermes API to be ready..."
@@ -300,13 +322,23 @@ echo ""
 echo "  ✅ ACP agents run natively on the host"
 echo "     └── Full access to: host filesystem, processes, network"
 echo ""
-echo "  Services:"
-echo "    Hermes  → systemctl --user status hermes-gateway"
-echo "    AionUi  → systemctl --user status aionui-webui"
-echo ""
-echo "  Logs:"
-echo "    Hermes  → journalctl --user -u hermes-gateway -f"
-echo "    AionUi  → journalctl --user -u aionui-webui -f"
+if [[ "$SYSTEMD_AVAILABLE" == "true" ]]; then
+  echo "  Services:"
+  echo "    Hermes  → systemctl --user status hermes-gateway"
+  echo "    AionUi  → systemctl --user status aionui-webui"
+  echo ""
+  echo "  Logs:"
+  echo "    Hermes  → journalctl --user -u hermes-gateway -f"
+  echo "    AionUi  → journalctl --user -u aionui-webui -f"
+else
+  echo "  Services: (nohup — no systemd)"
+  echo "    Hermes  → PID: $(cat "$SETUP_DIR/pids/hermes-gateway.pid" 2>/dev/null || echo 'N/A')"
+  echo "    AionUi  → PID: $(cat "$SETUP_DIR/pids/aionui-webui.pid" 2>/dev/null || echo 'N/A')"
+  echo ""
+  echo "  Logs:"
+  echo "    Hermes  → cat ~/.hermes/hermes-gateway.log"
+  echo "    AionUi  → cat ~/hermes-aionui/aionui-webui.log"
+fi
 echo "    WebUI   → docker logs -f open-webui"
 echo ""
 echo "  To configure providers:"

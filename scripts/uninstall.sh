@@ -81,15 +81,25 @@ fi
 # ─── Stop Services (host mode) ─────────────────────────────────────
 if [[ "$MODE" == "host" ]]; then
   header "Stopping services"
-  for svc in aionui-webui hermes-gateway; do
-    if systemctl --user is-active "$svc" &>/dev/null 2>&1; then
-      systemctl --user disable --now "$svc" 2>/dev/null || true
-      info "Stopped $svc"
+  if command -v systemctl &>/dev/null && systemctl --user list-units --quiet &>/dev/null 2>&1; then
+    for svc in aionui-webui hermes-gateway; do
+      if systemctl --user is-active "$svc" &>/dev/null 2>&1; then
+        systemctl --user disable --now "$svc" 2>/dev/null || true
+        info "Stopped $svc (systemd)"
+      fi
+    done
+    rm -f "$HOME/.config/systemd/user/hermes-gateway.service" \
+          "$HOME/.config/systemd/user/aionui-webui.service" 2>/dev/null || true
+    systemctl --user daemon-reload 2>/dev/null || true
+  fi
+  # Kill nohup processes via PID file (whether systemd was used or not)
+  for pid_file in "$SETUP_DIR/pids/hermes-gateway.pid" "$SETUP_DIR/pids/aionui-webui.pid"; do
+    if [[ -f "$pid_file" ]]; then
+      kill "$(cat "$pid_file")" 2>/dev/null || true
+      rm -f "$pid_file"
+      info "Killed nohup process ($(basename "$pid_file" .pid))"
     fi
   done
-  rm -f "$HOME/.config/systemd/user/hermes-gateway.service" \
-        "$HOME/.config/systemd/user/aionui-webui.service" 2>/dev/null || true
-  systemctl --user daemon-reload 2>/dev/null || true
 else
   header "Stopping containers"
   if docker compose -f "$COMPOSE_FILE" ps --services --filter "status=running" 2>/dev/null | grep -q .; then
@@ -169,9 +179,11 @@ if [[ "$MODE" == "host" ]]; then
 fi
 
 # ─── Revert systemd linger (fix #1) ─────────────────────────────────
-if sudo loginctl show-user "$(whoami)" 2>/dev/null | grep -q "Linger=yes"; then
-  sudo loginctl disable-linger "$(whoami)" 2>/dev/null || true
-  info "Systemd linger disabled (reverted system-level change)."
+if command -v loginctl &>/dev/null; then
+  if sudo loginctl show-user "$(whoami)" 2>/dev/null | grep -q "Linger=yes"; then
+    sudo loginctl disable-linger "$(whoami)" 2>/dev/null || true
+    info "Systemd linger disabled (reverted system-level change)."
+  fi
 fi
 
 # ─── Setup metadata (must be deleted LAST — before zero-residue check) ──
