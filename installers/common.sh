@@ -94,27 +94,42 @@ sudo_check() {
 }
 
 # ─── Docker + Compose Verification ────────────────────────────────────
+D="docker"
+DC="docker compose"
 check_docker() {
   if ! command -v docker &>/dev/null; then
     error "Docker not found. Install Docker first: https://docs.docker.com/engine/install/"
     exit 1
   fi
-  if ! docker compose version &>/dev/null; then
+
+  # Check if user needs sudo for docker commands
+  if ! docker info &>/dev/null; then
+    local user="$(whoami)"
+    if sudo -u "$user" docker info &>/dev/null 2>&1; then
+      D="sudo -u $user docker"
+      DC="sudo -u $user docker compose"
+      warn "Permission denied — using sudo -u $user for docker commands"
+    elif sudo -n docker info &>/dev/null 2>&1; then
+      D="sudo -n docker"
+      DC="sudo -n docker compose"
+      warn "Permission denied — using sudo -n for docker commands"
+    else
+      error "Docker daemon is not running or permission denied."
+      error "  Add yourself to the docker group: sudo usermod -aG docker $USER && newgrp docker"
+      error "  Then start Docker: sudo systemctl start docker"
+      exit 1
+    fi
+  fi
+
+  if ! $DC version &>/dev/null; then
     error "Docker Compose v2 not found. Upgrade Docker: https://docs.docker.com/compose/install/"
     exit 1
   fi
-  info "Docker $(docker --version | cut -d' ' -f3 | tr -d ',')"
-  info "Compose $(docker compose version | cut -d' ' -f4)"
-
-  # Check daemon is actually running
-  if ! docker info &>/dev/null; then
-    error "Docker daemon is not running."
-    error "  Start Docker: sudo systemctl start docker  (or launch Docker Desktop)"
-    exit 1
-  fi
+  info "Docker $($D --version | cut -d' ' -f3 | tr -d ',')"
+  info "Compose $($DC version | cut -d' ' -f4)"
 
   # Check if host-gateway is supported (Docker >= 20.10)
-  if ! docker info --format '{{.ServerVersion}}' 2>/dev/null | grep -q '^2[0-9]\.'; then
+  if ! $D info --format '{{.ServerVersion}}' 2>/dev/null | grep -q '^2[0-9]\.'; then
     warn "Docker < 20.10 detected — host.docker.internal may not resolve automatically"
   fi
 }
@@ -239,12 +254,12 @@ rollback_cleanup() {
           ;;
         "compose_up")
           warn "Rolling back: docker compose down"
-          docker compose -f "$COMPOSE_DIR/docker-compose.yml" down --remove-orphans 2>/dev/null || true
+          $DC -f "$COMPOSE_DIR/docker-compose.yml" down --remove-orphans 2>/dev/null || true
           ;;
         "docker_run")
           warn "Rolling back: stopping open-webui container"
-          docker stop open-webui 2>/dev/null || true
-          docker rm open-webui 2>/dev/null || true
+          $D stop open-webui 2>/dev/null || true
+          $D rm open-webui 2>/dev/null || true
           ;;
         "systemd_hermes")
           warn "Rolling back: disabling hermes-gateway service"
@@ -291,4 +306,4 @@ rollback_cleanup() {
 
 # ─── Version Pinning ──────────────────────────────────────────────────
 HERMES_IMAGE="ghcr.io/anomalyco/hermes-agent:0.14.11"
-OPENWEBUI_IMAGE="ghcr.io/open-webui/open-webui:0.9.17"
+OPENWEBUI_IMAGE="ghcr.io/open-webui/open-webui:latest"

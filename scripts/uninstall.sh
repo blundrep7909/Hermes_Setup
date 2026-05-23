@@ -130,7 +130,7 @@ if [[ "$DELETE_DATA" == "true" ]]; then
 
   # Remove Docker images
   docker rmi ghcr.io/anomalyco/hermes-agent:0.14.11 2>/dev/null || true
-  docker rmi ghcr.io/open-webui/open-webui:0.9.17 2>/dev/null || true
+  docker rmi ghcr.io/open-webui/open-webui:latest 2>/dev/null || true
   docker rmi hermes-setup-aionui 2>/dev/null || true
 
   # Hermes config

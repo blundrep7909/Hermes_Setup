@@ -18,7 +18,7 @@ services:
       start_period: 60s
 
   open-webui:
-    image: ghcr.io/open-webui/open-webui:0.9.17
+    image: ghcr.io/open-webui/open-webui:latest
     container_name: open-webui
     restart: unless-stopped
     ports:
