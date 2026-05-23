@@ -101,8 +101,8 @@ fi
 if "$HOME/.hermes-venv/bin/python" -c "import hermes_agent" 2>/dev/null; then
   info "hermes-agent already installed in venv"
 else
-  info "Installing hermes-agent[acp] in venv..."
-  "$HOME/.hermes-venv/bin/pip" install --no-cache-dir hermes-agent[acp]
+  info "Installing hermes-agent[acp,messaging] in venv..."
+  "$HOME/.hermes-venv/bin/pip" install --no-cache-dir hermes-agent[acp,messaging]
 fi
 
 HERMES_BIN="$HOME/.hermes-venv/bin/hermes"
