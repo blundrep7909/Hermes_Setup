@@ -25,7 +25,7 @@ echo "    • /var/lib/systemd/linger/$(whoami)  — enables user services after
 echo "    • Docker image (1 pull)"
 echo ""
 echo "  USER-LEVEL (in \$HOME — fully reversible):"
-echo "    • ~/.hermes-venv/          Python venv with hermes-agent[acp] (~200MB)"
+echo "    • ~/.hermes-venv/          Python venv with hermes-agent[acp,messaging] (~200MB)"
 echo "    • ~/hermes-aionui/         AionUi git clone + bun build (~500MB)"
 echo "    • ~/.hermes/               Hermes config (~10KB)"
 echo "    • ~/.hermes-setup/         Installer metadata + PID files (~10KB)"
@@ -39,10 +39,14 @@ echo ""
 echo "  Total disk: ~3.5GB"
 echo "  All of this is COMPLETELY REVERSIBLE via: bash ~/Hermes_Setup/scripts/uninstall.sh"
 echo ""
-read -rp "Proceed with installation? [Y/n] " REPLY
-if [[ "$REPLY" =~ ^[Nn] ]]; then
-  info "Cancelled."
-  exit 0
+if [[ -t 0 ]]; then
+  read -rp "Proceed with installation? [Y/n] " REPLY
+  if [[ "$REPLY" =~ ^[Nn] ]]; then
+    info "Cancelled."
+    exit 0
+  fi
+else
+  info "Non-interactive — skipping confirmation prompt"
 fi
 
 # ─── Prerequisites ─────────────────────────────────────────────────────
