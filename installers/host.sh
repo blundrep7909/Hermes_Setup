@@ -49,6 +49,9 @@ else
   info "Non-interactive — skipping confirmation prompt"
 fi
 
+# ─── Pre-flight port check (BEFORE rollback — fail cleanly, no rollback)
+preflight_port_check
+
 # ─── Prerequisites ─────────────────────────────────────────────────────
 rollback_init
 rollback_step "detection"
@@ -68,11 +71,6 @@ check_docker
 
 rollback_step "systemd_check"
 check_systemd
-
-rollback_step "port_check"
-port_check 8642 "Hermes API" || exit 1
-port_check 3000 "Open WebUI" || exit 1
-port_check 3001 "AionUi WebUI" || exit 1
 
 # ─── Generate Credentials ─────────────────────────────────────────────
 rollback_step "keygen"
@@ -106,7 +104,14 @@ if "$HOME/.hermes-venv/bin/python" -c "import hermes_agent" 2>/dev/null; then
   info "hermes-agent already installed in venv"
 else
   info "Installing hermes-agent[acp,messaging] in venv..."
-  "$HOME/.hermes-venv/bin/pip" install --no-cache-dir hermes-agent[acp,messaging]
+  if "$HOME/.hermes-venv/bin/pip" install --no-cache-dir hermes-agent[acp,messaging]; then
+    info "hermes-agent[acp,messaging] installed"
+  else
+    warn "hermes-agent[acp,messaging] failed — installing [acp] + aiohttp separately"
+    warn "  Messaging platforms (telegram, discord, slack) will NOT be available."
+    warn "  To add them later: pip install hermes-agent[messaging]"
+    "$HOME/.hermes-venv/bin/pip" install --no-cache-dir hermes-agent[acp] aiohttp
+  fi
 fi
 
 HERMES_BIN="$HOME/.hermes-venv/bin/hermes"

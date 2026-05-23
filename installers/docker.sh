@@ -17,6 +17,9 @@ echo ""
 
 validate_home
 
+# ─── Pre-flight port check (BEFORE rollback — fail cleanly, no rollback)
+preflight_port_check
+
 # ─── Prerequisites ─────────────────────────────────────────────────────
 rollback_init
 rollback_step "detection"
@@ -31,11 +34,6 @@ if [[ "$WSL" == "wsl2" ]]; then
 fi
 
 check_docker
-
-rollback_step "port_check"
-port_check 8642 "Hermes API" || exit 1
-port_check 3000 "Open WebUI" || exit 1
-port_check 3001 "AionUi" || exit 1
 
 # ─── Generate Credentials ─────────────────────────────────────────────
 rollback_step "keygen"

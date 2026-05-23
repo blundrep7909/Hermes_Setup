@@ -38,7 +38,7 @@ if [[ "$MODE" == "host" ]]; then
   # ─── Hermes ──────────────────────────────────────────────────────────
   if [[ -d "$HOME/.hermes-venv" ]]; then
     info "Updating Hermes via pip..."
-    "$HOME/.hermes-venv/bin/pip" install --upgrade hermes-agent[acp] 2>/dev/null || \
+    "$HOME/.hermes-venv/bin/pip" install --upgrade hermes-agent[acp] aiohttp 2>/dev/null || \
       warn "pip upgrade failed, skipping Hermes update"
 
     if systemctl --user is-active hermes-gateway &>/dev/null 2>&1; then
