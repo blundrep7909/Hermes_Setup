@@ -133,8 +133,10 @@ bash ~/Hermes_Setup/scripts/uninstall.sh --force
 
 ```bash
 # Host mode
-systemctl --user status hermes-gateway      # Check Hermes (or nohup)
-systemctl --user status aionui-webui        # Check AionUi (or nohup)
+systemctl --user status hermes-gateway      # Check Hermes (systemd)
+systemctl --user status aionui-webui        # Check AionUi (systemd)
+cat ~/.hermes-setup/pids/hermes-gateway.pid # Check Hermes PID (nohup)
+cat ~/.hermes-setup/pids/aionui-webui.pid   # Check AionUi PID (nohup)
 journalctl --user -u hermes-gateway -f      # Hermes logs (systemd only)
 journalctl --user -u aionui-webui -f        # AionUi logs (systemd only)
 docker logs -f open-webui                   # Open WebUI logs

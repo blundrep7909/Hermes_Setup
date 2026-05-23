@@ -97,7 +97,7 @@ if [[ "$MODE" == "host" ]]; then
       --add-host host.docker.internal:host-gateway \
       -v open-webui-data:/app/backend/data \
       -e "OPENAI_API_BASE_URL=http://host.docker.internal:8642/v1" \
-      -e "OPENAI_API_KEY=$(grep API_SERVER_KEY "$HOME/.hermes/.env" 2>/dev/null | cut -d= -f2 || echo '')" \
+      -e "OPENAI_API_KEY=$(grep '^API_SERVER_KEY=' "$HOME/.hermes/.env" 2>/dev/null | head -1 | cut -d= -f2 || echo '')" \
       -e BYPASS_MODEL_ACCESS_CONTROL=true \
       -e AIOHTTP_CLIENT_TIMEOUT=120 \
       ghcr.io/open-webui/open-webui:0.9.17

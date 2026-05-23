@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Detect pipe mode (curl ... | bash) — BASH_SOURCE[0] is empty/unset
+if [[ -z "${BASH_SOURCE[0]:-}" ]]; then
+    echo "Pipe mode detected — cloning Hermes_Setup repo..."
+    TMP_DIR=$(mktemp -d)
+    git clone --depth=1 https://github.com/blundrep7909/Hermes_Setup.git "$TMP_DIR"
+    exec bash "$TMP_DIR/installers/docker.sh" "$@"
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/common.sh"
 
