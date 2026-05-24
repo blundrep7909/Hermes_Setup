@@ -294,7 +294,7 @@ SERVICE_HERMES_EOF
 [Unit]
 Description=AionUi WebUI (Headless)
 After=network.target hermes-gateway.service
-BindsTo=hermes-gateway.service
+Wants=hermes-gateway.service
 
 [Service]
 Type=simple
