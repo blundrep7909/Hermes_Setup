@@ -294,7 +294,7 @@ else
   info "Starting Open WebUI container..."
   openwebui_started=false
   for attempt in 1 2 3 4 5; do
-    if $D run -d \
+    $D run -d \
       --name open-webui \
       --restart unless-stopped \
       -p 3000:8080 \
@@ -304,7 +304,8 @@ else
       -e OPENAI_API_KEY="$API_SERVER_KEY" \
       -e BYPASS_MODEL_ACCESS_CONTROL=true \
       -e AIOHTTP_CLIENT_TIMEOUT=120 \
-      "$OPENWEBUI_IMAGE" 2>/dev/null; then
+      "$OPENWEBUI_IMAGE" >/dev/null 2>&1
+    if $D inspect --format='{{.State.Status}}' open-webui 2>/dev/null | grep -q running; then
       openwebui_started=true
       break
     fi
