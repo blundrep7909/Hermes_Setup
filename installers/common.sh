@@ -134,6 +134,15 @@ check_docker() {
   fi
 }
 
+# ─── Docker Port Canary ───────────────────────────────────────────────
+docker_port_canary() {
+  local port="$1"
+  [[ -z "${D:-}" ]] && return 0
+  local img="alpine:3.19"
+  $D image inspect "$img" &>/dev/null || $D pull "$img" &>/dev/null || return 0
+  $D run --rm -p "$port":8080 "$img" true 2>/dev/null
+}
+
 # ─── Port Availability ────────────────────────────────────────────────
 port_check() {
   local port="$1" name="$2"
@@ -164,6 +173,8 @@ preflight_port_check() {
   for spec in 8642:Hermes 3000:OpenWebUI 3001:AionUi; do
     local port="${spec%%:*}"
     local name="${spec##*:}"
+
+    # Check via bash /dev/tcp (catches WSL2-native and normal listeners)
     if timeout 2 bash -c "echo > /dev/tcp/0.0.0.0/$port" 2>/dev/null; then
       local owner
       owner=$(port_owner "$port")
@@ -173,6 +184,13 @@ preflight_port_check() {
         error "Port $port ($name) already in use — check: sudo lsof -i :$port"
       fi
       any_busy=true
+
+    # Docker canary (catches stale docker-proxy in WSL2)
+    elif [[ "$port" == "3000" ]] && [[ -n "${D:-}" ]]; then
+      if ! docker_port_canary "$port"; then
+        error "Port $port ($name) is busy inside Docker — restart Docker or kill dangling docker-proxy"
+        any_busy=true
+      fi
     fi
   done
   if [[ "$any_busy" == "true" ]]; then
