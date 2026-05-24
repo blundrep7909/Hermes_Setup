@@ -293,13 +293,19 @@ start_openwebui_container() {
 
   # Wait for port 3000 to be Docker-bindable (Docker canary — works in WSL2)
   info "Waiting for port 3000 to be available..."
-  for i in $(seq 1 20); do
+  for i in $(seq 1 30); do
     if $D run --rm -p 3000:8080 alpine:3.19 true 2>/dev/null; then
+      info "Port 3000 is now available."
       break
     fi
-    [[ $i -eq 20 ]] && error "Port 3000 still busy after 60s — try: sudo service docker restart" && exit 125
+    if [[ $i -eq 30 ]]; then
+      error "Port 3000 still busy after 90s — try: sudo service docker restart"
+      exit 125
+    fi
+    printf "."
     sleep 3
   done
+  echo "" # to end the line of dots
 
   info "Starting Open WebUI container..."
   local started=false
