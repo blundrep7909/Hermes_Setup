@@ -39,7 +39,7 @@ read_mode() {
   grep "^mode:" "$STATE_FILE" 2>/dev/null | cut -d: -f2
 }
 
-MODE="${1:-}"
+MODE=""
 FORCE=false
 
 for arg in "$@"; do

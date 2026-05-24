@@ -12,6 +12,16 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/common.sh"
 
+# ─── Flag parsing ──────────────────────────────────────────────────────
+FRESH_FLAG=false
+UPDATE_FLAG=false
+for arg in "$@"; do
+  case "$arg" in
+    --fresh)  FRESH_FLAG=true  ;;
+    --update) UPDATE_FLAG=true ;;
+  esac
+done
+
 header "Hermes Setup – Docker Mode (All Containerized)"
 echo ""
 
@@ -20,9 +30,38 @@ validate_home
 # ─── Pre-flight port check (BEFORE rollback — fail cleanly, no rollback)
 preflight_port_check
 
+# ─── Detect existing installation → prompt mode ────────────────────────
+EXISTING=$(detect_existing_installation)
+DO_ROLLBACK=true
+FORCE_UPGRADE=false
+INSTALL_MODE="normal"
+
+if [[ -n "$EXISTING" ]]; then
+  INSTALL_MODE=$(prompt_install_mode "$EXISTING")
+  case "$INSTALL_MODE" in
+    cancel)
+      info "Cancelled."
+      exit 0
+      ;;
+    fresh)
+      info "Uninstalling existing installation..."
+      bash "$SCRIPT_DIR/../scripts/uninstall.sh" --docker --force
+      info "Proceeding with fresh install..."
+      ;;
+    update)
+      FORCE_UPGRADE=true
+      DO_ROLLBACK=false
+      header "Update Mode — upgrading existing components"
+      echo ""
+      ;;
+  esac
+fi
+
 # ─── Prerequisites ─────────────────────────────────────────────────────
-rollback_init
-rollback_step "detection"
+if [[ "$DO_ROLLBACK" == "true" ]]; then
+  rollback_init
+  rollback_step "detection"
+fi
 
 OS="$(detect_os)"
 WSL="$(detect_wsl)"
@@ -48,11 +87,21 @@ ensure_hermes_env
 store_mode "docker"
 
 # ─── Deploy Containers ────────────────────────────────────────────────
-rollback_step "compose_build"
-info "Building AionUi Docker image (custom, with hermes-agent[acp])..."
-$DC -f "$COMPOSE_DIR/docker-compose.yml" build aionui
+if [[ "$FORCE_UPGRADE" == "true" ]]; then
+  info "Pulling latest images..."
+  $DC -f "$COMPOSE_DIR/docker-compose.yml" pull
+  info "Recreating containers with latest images..."
+else
+  if [[ "$DO_ROLLBACK" == "true" ]]; then
+    rollback_step "compose_build"
+  fi
+  info "Building AionUi Docker image (custom, with hermes-agent[acp])..."
+  $DC -f "$COMPOSE_DIR/docker-compose.yml" build aionui
 
-rollback_step "compose_up"
+  if [[ "$DO_ROLLBACK" == "true" ]]; then
+    rollback_step "compose_up"
+  fi
+fi
 info "Starting all containers (Hermes + Open WebUI + AionUi)..."
 export API_SERVER_KEY
 $DC -f "$COMPOSE_DIR/docker-compose.yml" up -d
@@ -80,7 +129,11 @@ trap - EXIT
 echo ""
 header "Installation Complete"
 echo ""
-echo "  Mode:         Docker (all 3 in containers)"
+if [[ "$INSTALL_MODE" == "update" ]]; then
+  echo "  Mode:         Docker (update) — existing containers upgraded"
+else
+  echo "  Mode:         Docker (all 3 in containers)"
+fi
 echo "  Hermes API:   http://localhost:8642/v1"
 echo "  Open WebUI:   http://localhost:3000"
 echo "  AionUi:       http://localhost:3001"

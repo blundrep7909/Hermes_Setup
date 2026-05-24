@@ -12,49 +12,93 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/common.sh"
 
+# ─── Flag parsing ──────────────────────────────────────────────────────
+FRESH_FLAG=false
+UPDATE_FLAG=false
+for arg in "$@"; do
+  case "$arg" in
+    --fresh)  FRESH_FLAG=true  ;;
+    --update) UPDATE_FLAG=true ;;
+  esac
+done
+
 header "Hermes Setup – Host Mode (Native Hermes + AionUi, Docker Open WebUI)"
 echo ""
 
 validate_home
 
-# ─── Pre-Install Plan Display (fix #20) ────────────────────────────────
-header "Pre-Install Plan — What will be installed on YOUR system"
-echo ""
-echo "  SYSTEM-LEVEL (requires sudo once):"
-echo "    • /var/lib/systemd/linger/$(whoami)  — enables user services after logout (if systemd available)"
-echo "    • Docker image (1 pull)"
-echo ""
-echo "  USER-LEVEL (in \$HOME — fully reversible):"
-echo "    • ~/.hermes-venv/          Python venv with hermes-agent[acp,messaging] (~200MB)"
-echo "    • ~/hermes-aionui/         AionUi git clone + bun build (~500MB)"
-echo "    • ~/.hermes/               Hermes config (~10KB)"
-echo "    • ~/.hermes-setup/         Installer metadata + PID files (~10KB)"
-echo "    • ~/.bun/                  Bun runtime if not already installed (~300MB)"
-echo "    • ~/.local/bin/hermes      Symlink to hermes CLI"
-echo "    • ~/.config/systemd/user/  2 systemd service files (if systemd available)"
-echo "    • ~/.hermes-setup/pids/    PID files for nohup fallback (if systemd unavailable)"
-echo "    • ~/.bashrc / .zshrc       3 lines (PATH + env sourcing)"
-echo "    • Docker volume            1 (open-webui-data)"
-echo ""
-echo "  Total disk: ~3.5GB"
-echo "  All of this is COMPLETELY REVERSIBLE via: bash ~/Hermes_Setup/scripts/uninstall.sh"
-echo ""
-if [[ -t 0 ]]; then
-  read -rp "Proceed with installation? [Y/n] " REPLY
-  if [[ "$REPLY" =~ ^[Nn] ]]; then
-    info "Cancelled."
-    exit 0
-  fi
-else
-  info "Non-interactive — skipping confirmation prompt"
-fi
+validate_home
 
 # ─── Pre-flight port check (BEFORE rollback — fail cleanly, no rollback)
 preflight_port_check
 
+# ─── Detect existing installation → prompt mode ────────────────────────
+EXISTING=$(detect_existing_installation)
+DO_ROLLBACK=true
+FORCE_UPGRADE=false
+INSTALL_MODE="normal"
+
+if [[ -n "$EXISTING" ]]; then
+  INSTALL_MODE=$(prompt_install_mode "$EXISTING")
+  case "$INSTALL_MODE" in
+    cancel)
+      info "Cancelled."
+      exit 0
+      ;;
+    fresh)
+      info "Uninstalling existing installation..."
+      bash "$SCRIPT_DIR/../scripts/uninstall.sh" --host --force
+      info "Proceeding with fresh install..."
+      ;;
+    update)
+      FORCE_UPGRADE=true
+      DO_ROLLBACK=false
+      header "Update Mode — upgrading existing components"
+      echo ""
+      ;;
+  esac
+fi
+
+# ─── Pre-Install Plan + Confirmation (normal/fresh only) ───────────────
+# Update mode user already chose U — no additional prompt needed
+if [[ "$INSTALL_MODE" != "update" ]]; then
+  header "Pre-Install Plan — What will be installed on YOUR system"
+  echo ""
+  echo "  SYSTEM-LEVEL (requires sudo once):"
+  echo "    • /var/lib/systemd/linger/$(whoami)  — enables user services after logout (if systemd available)"
+  echo "    • Docker image (1 pull)"
+  echo ""
+  echo "  USER-LEVEL (in \$HOME — fully reversible):"
+  echo "    • ~/.hermes-venv/          Python venv with hermes-agent[acp,messaging] (~200MB)"
+  echo "    • ~/hermes-aionui/         AionUi git clone + bun build (~500MB)"
+  echo "    • ~/.hermes/               Hermes config (~10KB)"
+  echo "    • ~/.hermes-setup/         Installer metadata + PID files (~10KB)"
+  echo "    • ~/.bun/                  Bun runtime if not already installed (~300MB)"
+  echo "    • ~/.local/bin/hermes      Symlink to hermes CLI"
+  echo "    • ~/.config/systemd/user/  2 systemd service files (if systemd available)"
+  echo "    • ~/.hermes-setup/pids/    PID files for nohup fallback (if systemd unavailable)"
+  echo "    • ~/.bashrc / .zshrc       3 lines (PATH + env sourcing)"
+  echo "    • Docker volume            1 (open-webui-data)"
+  echo ""
+  echo "  Total disk: ~3.5GB"
+  echo "  All of this is COMPLETELY REVERSIBLE via: bash ~/Hermes_Setup/scripts/uninstall.sh"
+  echo ""
+  if [[ -t 0 ]]; then
+    read -rp "Proceed with installation? [Y/n] " REPLY
+    if [[ "$REPLY" =~ ^[Nn] ]]; then
+      info "Cancelled."
+      exit 0
+    fi
+  else
+    info "Non-interactive — skipping confirmation prompt"
+  fi
+fi
+
 # ─── Prerequisites ─────────────────────────────────────────────────────
-rollback_init
-rollback_step "detection"
+if [[ "$DO_ROLLBACK" == "true" ]]; then
+  rollback_init
+  rollback_step "detection"
+fi
 
 OS="$(detect_os)"
 WSL="$(detect_wsl)"
@@ -92,16 +136,32 @@ fi
 info "Using Python: $($PYTHON --version)"
 
 # ─── Create Hermes venv + install ─────────────────────────────────────
-rollback_step "venv_created"
+if [[ "$DO_ROLLBACK" == "true" ]]; then
+  rollback_step "venv_created"
+fi
 if [[ -d "$HOME/.hermes-venv" ]]; then
-  info "Hermes venv already exists at ~/.hermes-venv"
+  if [[ "$FORCE_UPGRADE" == "true" ]]; then
+    info "Hermes venv exists — upgrading..."
+  else
+    info "Hermes venv already exists at ~/.hermes-venv"
+  fi
 else
   info "Creating Python venv at ~/.hermes-venv..."
   "$PYTHON" -m venv "$HOME/.hermes-venv"
 fi
 
 if "$HOME/.hermes-venv/bin/python" -c "import hermes_agent" 2>/dev/null; then
-  info "hermes-agent already installed in venv"
+  if [[ "$FORCE_UPGRADE" == "true" ]]; then
+    info "Upgrading hermes-agent to latest version..."
+    if "$HOME/.hermes-venv/bin/pip" install --no-cache-dir --upgrade hermes-agent[acp,messaging]; then
+      info "hermes-agent upgraded"
+    else
+      warn "hermes-agent upgrade failed — trying [acp] + aiohttp"
+      "$HOME/.hermes-venv/bin/pip" install --no-cache-dir --upgrade hermes-agent[acp] aiohttp
+    fi
+  else
+    info "hermes-agent already installed in venv"
+  fi
 else
   info "Installing hermes-agent[acp,messaging] in venv..."
   if "$HOME/.hermes-venv/bin/pip" install --no-cache-dir hermes-agent[acp,messaging]; then
@@ -129,8 +189,10 @@ ensure_hermes_env
 # ─── Persist Mode ─────────────────────────────────────────────────────
 store_mode "host"
 
-# ─── Install AionUi Natively (Option C) ──────────────────────────────
-rollback_step "aionui_build"
+# ─── Install AionUi Natively ─────────────────────────────────────────
+if [[ "$DO_ROLLBACK" == "true" ]]; then
+  rollback_step "aionui_build"
+fi
 AIONUI_DIR="$HOME/hermes-aionui"
 
 # Track bun pre-existing state (fix #11)
@@ -152,10 +214,18 @@ done
 export PATH="$HOME/.bun/bin:$PATH"
 
 if [[ -d "$AIONUI_DIR" ]]; then
-  info "AionUi directory exists at $AIONUI_DIR"
-  if [[ ! -f "$AIONUI_DIR/node_modules/.package-lock.json" ]]; then
-    info "Dependencies not installed — running bun install..."
+  if [[ "$FORCE_UPGRADE" == "true" ]]; then
+    info "Updating AionUi from git..."
+    (cd "$AIONUI_DIR" && git pull)
     "$BUN_BIN" install --cwd "$AIONUI_DIR"
+    "$BUN_BIN" run --cwd "$AIONUI_DIR" build:renderer:web
+    "$BUN_BIN" run --cwd "$AIONUI_DIR" build:server
+  else
+    info "AionUi directory exists at $AIONUI_DIR"
+    if [[ ! -f "$AIONUI_DIR/node_modules/.package-lock.json" ]]; then
+      info "Dependencies not installed — running bun install..."
+      "$BUN_BIN" install --cwd "$AIONUI_DIR"
+    fi
   fi
 else
   info "Cloning AionUi to $AIONUI_DIR..."
@@ -275,10 +345,11 @@ for i in $(seq 1 15); do
 done
 
 # ─── Start Open WebUI (Docker) ──────────────────────────────────────
-rollback_step "docker_run"
+if [[ "$DO_ROLLBACK" == "true" ]]; then
+  rollback_step "docker_run"
+fi
 OPENWEBUI_URL="http://host.docker.internal:8642/v1"
 if [[ "$WSL" == "wsl2" ]]; then
-  # Fix #14: try multiple interface names
   WSL2_IP=""
   for iface in eth0 eth1 bond0; do
     WSL2_IP="$(ip addr show "$iface" 2>/dev/null | grep 'inet ' | awk '{print $2}' | cut -d/ -f1)"
@@ -287,37 +358,12 @@ if [[ "$WSL" == "wsl2" ]]; then
   OPENWEBUI_URL="http://${WSL2_IP:-host.docker.internal}:8642/v1"
 fi
 
-if $D ps --format '{{.Names}}' 2>/dev/null | grep -q '^open-webui$'; then
-  info "Open WebUI container already running"
-else
-  $D rm -f open-webui 2>/dev/null || true
-  info "Starting Open WebUI container..."
-  openwebui_started=false
-  for attempt in 1 2 3 4 5; do
-    $D run -d \
-      --name open-webui \
-      --restart unless-stopped \
-      -p 3000:8080 \
-      --add-host host.docker.internal:host-gateway \
-      -v open-webui-data:/app/backend/data \
-      -e OPENAI_API_BASE_URL="$OPENWEBUI_URL" \
-      -e OPENAI_API_KEY="$API_SERVER_KEY" \
-      -e BYPASS_MODEL_ACCESS_CONTROL=true \
-      -e AIOHTTP_CLIENT_TIMEOUT=120 \
-      "$OPENWEBUI_IMAGE" >/dev/null 2>&1 || true
-    if $D inspect --format='{{.State.Status}}' open-webui 2>/dev/null | grep -q running; then
-      openwebui_started=true
-      break
-    fi
-    warn "Port 3000 still busy (attempt $attempt/5) — retrying in 3s..."
-    sleep 3
-    $D rm -f open-webui 2>/dev/null || true
-  done
-  if [[ "$openwebui_started" != "true" ]]; then
-    error "Could not bind port 3000 after 5 attempts — another process is holding it"
-    exit 125
-  fi
+if [[ "$FORCE_UPGRADE" == "true" ]]; then
+  info "Pulling latest Open WebUI image..."
+  $D pull "$OPENWEBUI_IMAGE" >/dev/null 2>&1 || true
 fi
+
+start_openwebui_container "$OPENWEBUI_URL" "$API_SERVER_KEY"
 
 # ─── Wait for Open WebUI health ───────────────────────────────────────
 info "Waiting for Open WebUI to be ready..."
@@ -360,7 +406,12 @@ trap - EXIT
 echo ""
 header "Installation Complete"
 echo ""
-echo "  Mode:         Host — fully reversible via uninstall.sh"
+if [[ "$INSTALL_MODE" == "update" ]]; then
+  echo "  Mode:         Host (update) — existing components upgraded"
+  echo "  Re-run with:  bash ~/Hermes_Setup/scripts/uninstall.sh --force (for clean reinstall)"
+else
+  echo "  Mode:         Host — fully reversible via uninstall.sh"
+fi
 echo ""
 echo "  Hermes API:   http://localhost:8642/v1"
 echo "  Open WebUI:   http://localhost:3000"

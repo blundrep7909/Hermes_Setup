@@ -168,28 +168,96 @@ port_owner() {
   echo "$owner"
 }
 
+# ─── Existing Installation Detection ──────────────────────────────────
+is_component_installed() {
+  case "${1,,}" in
+    hermes)
+      [[ -f "$HOME/.hermes/config.yaml" ]] || [[ -d "$HOME/.hermes-venv" ]]
+      ;;
+    openwebui)
+      if command -v docker &>/dev/null; then
+        docker ps -a --format '{{.Names}}' 2>/dev/null | grep -q '^open-webui$' || \
+        sudo -n docker ps -a --format '{{.Names}}' 2>/dev/null | grep -q '^open-webui$'
+      fi
+      ;;
+    aionui)
+      [[ -d "$HOME/hermes-aionui" ]]
+      ;;
+    *) return 1 ;;
+  esac
+}
+
+detect_existing_installation() {
+  local found=""
+  is_component_installed "Hermes"    && found="$found hermes"
+  is_component_installed "OpenWebUI" && found="$found openwebui"
+  is_component_installed "AionUi"    && found="$found aionui"
+  echo "$found"
+}
+
+prompt_install_mode() {
+  local detected="$1"
+
+  header "Existing Installation Detected"
+  echo ""
+  echo "  Components found:$detected"
+  echo ""
+  echo "  (U)pdate   — upgrade existing + install missing (default)"
+  echo "  (F)resh    — wipe everything, then clean install"
+  echo "  (C)ancel   — do nothing"
+  echo ""
+
+  if [[ "${UPDATE_FLAG:-false}" == "true" ]]; then
+    echo "update"
+  elif [[ "${FRESH_FLAG:-false}" == "true" ]]; then
+    echo "fresh"
+  elif [[ -t 0 ]]; then
+    local REPLY
+    while true; do
+      read -rp "  Choose [U/f/c]: " REPLY
+      REPLY="${REPLY:-U}"
+      case "${REPLY^^}" in
+        U) echo "update"; return 0 ;;
+        F) echo "fresh";  return 0 ;;
+        C) echo "cancel"; return 0 ;;
+      esac
+      echo "  Invalid — enter U, F, or C"
+    done
+  else
+    echo "update"
+  fi
+}
+
+# ─── Port Preflight ─────────────────────────────────────────────────
 preflight_port_check() {
-  local any_busy=false
+  local any_busy=false any_ours=false
   for spec in 8642:Hermes 3000:OpenWebUI 3001:AionUi; do
     local port="${spec%%:*}"
     local name="${spec##*:}"
 
-    # Check via bash /dev/tcp (catches WSL2-native and normal listeners)
     if timeout 2 bash -c "echo > /dev/tcp/0.0.0.0/$port" 2>/dev/null; then
-      local owner
-      owner=$(port_owner "$port")
-      if [[ -n "$owner" ]]; then
-        error "Port $port ($name) in use by: $owner"
+      if is_component_installed "$name"; then
+        warn "Port $port ($name) in use by existing $name installation"
+        any_ours=true
       else
-        error "Port $port ($name) already in use — check: sudo lsof -i :$port"
+        local owner; owner=$(port_owner "$port")
+        if [[ -n "$owner" ]]; then
+          error "Port $port ($name) in use by: $owner"
+        else
+          error "Port $port ($name) already in use — check: sudo lsof -i :$port"
+        fi
+        any_busy=true
       fi
-      any_busy=true
 
-    # Docker canary (catches stale docker-proxy in WSL2)
     elif [[ "$port" == "3000" ]] && [[ -n "${D:-}" ]]; then
       if ! docker_port_canary "$port"; then
-        error "Port $port ($name) is busy inside Docker — restart Docker or kill dangling docker-proxy"
-        any_busy=true
+        if is_component_installed "OpenWebUI"; then
+          warn "Port $port ($name) Docker port busy — existing Open WebUI installation"
+          any_ours=true
+        else
+          error "Port $port ($name) is busy inside Docker — restart Docker or kill dangling docker-proxy"
+          any_busy=true
+        fi
       fi
     fi
   done
@@ -199,7 +267,52 @@ preflight_port_check() {
     info "  To free a port: kill the process or change the port assignment."
     exit 1
   fi
-  info "All required ports (8642, 3000, 3001): available"
+  if [[ "$any_ours" == "true" ]]; then
+    echo ""
+    warn "Existing Hermes Stack components detected on required ports."
+  else
+    info "All required ports (8642, 3000, 3001): available"
+  fi
+}
+
+# ─── Open WebUI Container Start (shared by host.sh & docker.sh) ──────
+start_openwebui_container() {
+  local openwebui_url="$1"
+  local api_key="$2"
+
+  if $D ps --format '{{.Names}}' 2>/dev/null | grep -q '^open-webui$'; then
+    info "Open WebUI container already running"
+    return 0
+  fi
+
+  $D rm -f open-webui >/dev/null 2>&1 || true
+  info "Starting Open WebUI container..."
+  local started=false
+  for attempt in 1 2 3 4 5; do
+    $D run -d \
+      --name open-webui \
+      --restart unless-stopped \
+      -p 3000:8080 \
+      --add-host host.docker.internal:host-gateway \
+      -v open-webui-data:/app/backend/data \
+      -e OPENAI_API_BASE_URL="$openwebui_url" \
+      -e OPENAI_API_KEY="$api_key" \
+      -e BYPASS_MODEL_ACCESS_CONTROL=true \
+      -e AIOHTTP_CLIENT_TIMEOUT=120 \
+      "$OPENWEBUI_IMAGE" >/dev/null 2>&1 || true
+    if $D inspect --format='{{.State.Status}}' open-webui 2>/dev/null | grep -q running; then
+      started=true
+      break
+    fi
+    warn "Port 3000 still busy (attempt $attempt/5) — retrying in 3s..."
+    sleep 3
+    $D rm -f open-webui >/dev/null 2>&1 || true
+  done
+  if [[ "$started" != "true" ]]; then
+    error "Could not bind port 3000 after 5 attempts — another process is holding it"
+    exit 125
+  fi
+  info "Open WebUI container started"
 }
 
 # ─── API Key Generation ──────────────────────────────────────────────
@@ -293,6 +406,7 @@ rollback_init() {
 }
 
 rollback_step() {
+  [[ -f "$STATE_FILE" ]] || return 0
   echo "$*" >> "$STATE_FILE"
 }
 
