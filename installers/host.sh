@@ -292,7 +292,7 @@ if $D ps --format '{{.Names}}' 2>/dev/null | grep -q '^open-webui$'; then
 else
   $D rm -f open-webui 2>/dev/null || true
   info "Starting Open WebUI container..."
-  local openwebui_started=false
+  openwebui_started=false
   for attempt in 1 2 3 4 5; do
     if $D run -d \
       --name open-webui \
