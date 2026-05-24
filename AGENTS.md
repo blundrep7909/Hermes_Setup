@@ -33,43 +33,6 @@ Bearer auth header.
 | `scripts/doctor.sh` | Post-install validation (10 checks: API, CLI, services, ports, config) |
 | `compose/` | Docker Compose files for all-containerized mode |
 
-## Applied Bug Fixes (chronological)
-
-### v1.0.0 — Foundational
-- `auxiliary.compression.timeout: 300` — prevents 8x retry rate (hermes-agent#22986)
-- `BYPASS_MODEL_ACCESS_CONTROL=true` — models not private by default (open-webui#7931)
-- `AIOHTTP_CLIENT_TIMEOUT=120` — default None = infinite hang (open-webui env.py)
-- AionUi runs headless `--webui` always (host mode); WSL detection uses multi-iface IP (eth0→eth1→bond0) for Open WebUI docker host access (aionui#2748)
-
-### v1.0.1 — Installer Reliability
-- Pipe-mode (`curl ... | bash`) detection → clone repo first, then exec installer
-- Docker sudo fallback: `docker info` → `sudo -u $USER` → `sudo -n`
-- Docker port retry loop: 5 attempts, retry on `$D inspect` status check (not exit code)
-- Open WebUI image tag `0.9.17` → `latest` (GHCR has no semver tags)
-- pip fallback: `hermes-agent[acp,messaging]` → `[acp]` + `aiohttp` (for VPS without libsodium/libffi)
-- AionUi web-only production build (vite build renderer + esbuild server, no electron)
-- systemd user services + nohup PID fallback for Hermes + AionUi
-
-### v1.0.2 — Preflight + Existing Installation Detection
-- Preflight port check before any changes (`/dev/tcp` + `ss -tlnpH` + Docker canary for port 3000)
-- Non-interactive TTY guard: `[[ -t 0 ]]` → skip confirmation prompt when piped
-- Existing installation detection via `detect_existing_installation()` + `prompt_install_mode()`
-- Install mode prompt: (U)pdate / (F)resh / (C)ancel with `--fresh`/`--update` flag overrides
-- `FORCE_UPGRADE` mode for update: `pip --upgrade`, `git pull`, `docker pull`
-- Rollback guarded by `[[ -f "$STATE_FILE" ]]` — no-op in update mode (no rollback_init)
-- Zero-residue uninstall: removes all files, services, Docker resources
-
-### v1.0.3 — Port 3000 Docker Canary (THIS SESSION)
-- Replaced `ss`-based stale docker-proxy detection with Docker canary (`$D run --rm -p 3000:8080 alpine:3.19 true`) — works in WSL2 where ss/lsof miss the proxy
-- Canary loop: 40 attempts × 3s = 120s timeout, shows progress dots (.........)
-- Container start retry: 10 attempts × 10s, captures docker stderr on bind failure, dumps container logs on crash failure
-- `libsecret-1-dev` added as AionUi system dependency (fixes `keytar` native module build during `bun install` postinstall)
-
-### v1.0.4 — Existing Installation Detection Fix (THIS SESSION)
-- **Critical bug**: `prompt_install_mode()` sent ALL display text (header, options, prompt) to stdout, which was captured by `$(...)` — so `INSTALL_MODE` contained the full prompt UI string instead of just "update"/"fresh"/"cancel"
-- **Fix**: All display lines now go to `>&2` (stderr); only the mode return value goes to stdout
-- This caused the detection → prompt flow to never trigger (the case statement never matched)
-
 ## Avoid These Mistakes
 - Do NOT use `OPENAI_BASE_URL` (wrong name; must be `OPENAI_API_BASE_URL`)
 - Do NOT set `OPENAI_API_KEY=***` literal string
@@ -117,3 +80,8 @@ sudo service docker restart
 - Long wait (up to 120s) for stale docker-proxy to release port 3000 after container removal
 - AionUi WebUI times out during keytar rebuild (mitigated by libsecret-1-dev, but postinstall may still log warnings)
 - `sudo -u gomugatling` bypass needed for every Docker command (user not in docker group)
+
+## Key Fixes Referenced in VERSION.md
+See [VERSION.md](./VERSION.md) for the full changelog. Key fixes this session:
+- `prompt_install_mode()` stdout leak fix — all display text now goes to stderr
+- Port 3000 Docker canary replaced `ss`-based detection (invisible in WSL2)
