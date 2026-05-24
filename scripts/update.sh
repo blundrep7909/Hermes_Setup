@@ -13,6 +13,22 @@ warn()  { echo -e "${YELLOW}[WARN]${NC}  $*"; }
 error() { echo -e "${RED}[ERROR]${NC} $*"; }
 header(){ echo -e "\n${BOLD}━━━ $* ━━━${NC}"; }
 
+# ─── Docker Permission Setup (same as installer) ─────────────────────────
+D="docker"
+DC="docker compose"
+check_docker() {
+  if command -v docker &>/dev/null; then
+    if ! docker info &>/dev/null 2>&1; then
+      local user="$(whoami)"
+      if sudo -u "$user" docker info &>/dev/null 2>&1; then
+        D="sudo -u $user docker"
+        DC="sudo -u $user docker compose"
+      fi
+    fi
+  fi
+}
+check_docker || true
+
 read_mode() {
   grep "^mode:" "$STATE_FILE" 2>/dev/null | cut -d: -f2
 }
@@ -88,14 +104,18 @@ if [[ "$MODE" == "host" ]]; then
 
   # ─── Open WebUI (Docker) ─────────────────────────────────────────────
   info "Pulling latest Open WebUI image..."
-  docker pull ghcr.io/open-webui/open-webui:latest
-  if docker ps --format '{{.Names}}' | grep -q '^open-webui$'; then
+  $D pull ghcr.io/open-webui/open-webui:latest
+  # Read stored Open WebUI port
+  OW_PORT="3000"
+  [[ -f "$SETUP_DIR/ow_port" ]] && OW_PORT="$(cat "$SETUP_DIR/ow_port")"
+  [[ -z "$OW_PORT" ]] && OW_PORT="3000"
+  if $D ps --format '{{.Names}}' | grep -q '^open-webui$'; then
     info "Recreating Open WebUI container..."
-    docker stop open-webui && docker rm open-webui
-    docker run -d \
+    $D stop open-webui && $D rm open-webui
+    $D run -d \
       --name open-webui \
       --restart unless-stopped \
-      -p 3000:8080 \
+      -p "${OW_PORT}:8080" \
       --add-host host.docker.internal:host-gateway \
       -v open-webui-data:/app/backend/data \
       -e "OPENAI_API_BASE_URL=http://host.docker.internal:8642/v1" \
@@ -107,8 +127,8 @@ if [[ "$MODE" == "host" ]]; then
 else
   # ─── Docker Mode ─────────────────────────────────────────────────────
   info "Pulling latest Docker images..."
-  docker compose -f "$COMPOSE_FILE" pull
-  docker compose -f "$COMPOSE_FILE" up -d --remove-orphans
+  $DC -f "$COMPOSE_FILE" pull
+  $DC -f "$COMPOSE_FILE" up -d --remove-orphans
 fi
 
 info "Running post-update verification..."

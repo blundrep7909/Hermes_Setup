@@ -1,3 +1,20 @@
+## 2026-05-24 — v1.1.0
+
+Host-mode port collision fix: AionUi native default port (3000) no longer conflicts with Open WebUI.
+
+### Fixed
+- **Port collision in host mode**: AionUi's production server defaults to port 3000, same as Open WebUI Docker.
+  Installer now auto-detects the conflict and maps Open WebUI to port 3001 instead. ([#1](https://github.com/blundrep7909/Hermes_Setup/issues/1))
+- **`update.sh`** now uses `$D`/`$DC` Docker permission variables (same as installer), fixing failures when user isn't in the docker group.
+- **`preflight_port_check`** in common.sh now accepts a mode parameter (`host` vs `docker`), correctly assigning port 3000 to AionUi in host mode.
+- **`doctor.sh`** reads stored Open WebUI port from `~/.hermes-setup/ow_port` instead of hardcoding 3000.
+
+### Added
+- **Dynamic Open WebUI port**: `host.sh` detects if port 3000 is occupied after AionUi starts, and remaps Open WebUI to 3001 automatically.
+- **Port persistence**: The chosen Open WebUI host port is saved to `~/.hermes-setup/ow_port` for `doctor.sh` and `update.sh` to use.
+
+---
+
 # Version History
 
 ## 2026-05-24 — v1.0.0

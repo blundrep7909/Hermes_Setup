@@ -234,8 +234,14 @@ prompt_install_mode() {
 
 # ─── Port Preflight ─────────────────────────────────────────────────
 preflight_port_check() {
+  local mode="${1:-docker}"
   local any_busy=false any_ours=false
-  for spec in 8642:Hermes 3000:OpenWebUI 3001:AionUi; do
+  if [[ "$mode" == "host" ]]; then
+    ports="8642:Hermes 3000:AionUi 3001:OpenWebUI"
+  else
+    ports="8642:Hermes 3000:OpenWebUI 3001:AionUi"
+  fi
+  for spec in $ports; do
     local port="${spec%%:*}"
     local name="${spec##*:}"
 
@@ -275,7 +281,7 @@ preflight_port_check() {
     echo ""
     warn "Existing Hermes Stack components detected on required ports."
   else
-    info "All required ports (8642, 3000, 3001): available"
+    info "All required ports: 8642, 3000, 3001"
   fi
 }
 
@@ -283,6 +289,7 @@ preflight_port_check() {
 start_openwebui_container() {
   local openwebui_url="$1"
   local api_key="$2"
+  local host_port="${3:-3000}"
 
   if $D ps --format '{{.Names}}' 2>/dev/null | grep -q '^open-webui$'; then
     info "Open WebUI container already running"
@@ -292,14 +299,14 @@ start_openwebui_container() {
   $D rm -f open-webui >/dev/null 2>&1 || true
 
   # Wait for port 3000 to be Docker-bindable (Docker canary — works in WSL2)
-  info "Waiting for port 3000 to be available..."
+  info "Waiting for port ${host_port} to be available..."
   for i in $(seq 1 30); do
-    if $D run --rm -p 3000:8080 alpine:3.19 true 2>/dev/null; then
-      info "Port 3000 is now available."
+    if $D run --rm -p "${host_port}:8080" alpine:3.19 true 2>/dev/null; then
+      info "Port ${host_port} is now available."
       break
     fi
     if [[ $i -eq 30 ]]; then
-      error "Port 3000 still busy after 90s — try: sudo service docker restart"
+      error "Port ${host_port} still busy after 90s — try: sudo service docker restart"
       exit 125
     fi
     printf "."
@@ -314,7 +321,7 @@ start_openwebui_container() {
     cid=$($D run -d \
       --name open-webui \
       --restart unless-stopped \
-      -p 3000:8080 \
+      -p "${host_port}:8080" \
       --add-host host.docker.internal:host-gateway \
       -v open-webui-data:/app/backend/data \
       -e OPENAI_API_BASE_URL="$openwebui_url" \

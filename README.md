@@ -48,9 +48,10 @@ Host:
 ├── Hermes Agent (venv, systemd)    ← ACP → full host control
 │   └── API Server (:8642/v1)
 ├── AionUi (native, systemd)         ← runs headless, no GUI needed
-│   └── WebUI (:3001)
+│   └── WebUI (:3000)
 └── Open WebUI (Docker container)    ← connects via host.docker.internal
     └── HTTP → Hermes API (:8642/v1)
+        └── Port :3001 if AionUi occupies :3000 (auto-detected)
 ```
 
 ### Docker Mode
@@ -72,7 +73,7 @@ Docker:
    # Docker mode
    docker exec -it hermes /opt/hermes/.venv/bin/hermes setup
    ```
-2. Open http://localhost:3000 (Open WebUI) or http://localhost:3001 (AionUi)
+2. Open http://localhost:3000 (AionUi) or http://localhost:3001 (Open WebUI — if port 3000 was taken)
 3. Models appear automatically — no manual URL or key config needed
 
 ## Service Reference
@@ -80,8 +81,10 @@ Docker:
 | Service | Port | URL | Host mode | Docker mode |
 |---------|------|-----|-----------|-------------|
 | Hermes API | 8642 | http://localhost:8642/v1 | Native (systemd or nohup) | Container |
-| Open WebUI | 3000 | http://localhost:3000 | Docker (single) | Container |
-| AionUi WebUI | 3001 | http://localhost:3001 | Native (systemd or nohup) | Container |
+| AionUi WebUI | 3000 | http://localhost:3000 | Native (systemd or nohup) | Container |
+| Open WebUI | 3000/3001\* | http://localhost:3000 (or :3001) | Docker (single) | Container |
+
+\* In host mode, Open WebUI auto-maps to port 3001 if AionUi occupies 3000.
 
 ## Management
 

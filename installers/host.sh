@@ -43,7 +43,7 @@ fi
 check_docker
 
 # ─── Pre-flight port check (BEFORE rollback — fail cleanly, no rollback)
-preflight_port_check
+preflight_port_check "host"
 
 # ─── Detect existing installation → prompt mode ────────────────────────
 EXISTING=$(detect_existing_installation)
@@ -353,6 +353,17 @@ done
 if [[ "$DO_ROLLBACK" == "true" ]]; then
   rollback_step "docker_run"
 fi
+
+# --- Detect AionUi port for Open WebUI port assignment ---
+OPENWEBUI_HOST_PORT=3000
+if timeout 2 bash -c 'echo > /dev/tcp/0.0.0.0/3000' 2>/dev/null; then
+  # Port 3000 is taken (likely by AionUi native) — map Open WebUI to 3001
+  OPENWEBUI_HOST_PORT=3001
+  echo "Open WebUI will use port 3001 (port 3000 in use)"
+fi
+echo "$OPENWEBUI_HOST_PORT" > "$SETUP_DIR/ow_port"
+info "Open WebUI host port: $OPENWEBUI_HOST_PORT"
+
 OPENWEBUI_URL="http://host.docker.internal:8642/v1"
 if [[ "$WSL" == "wsl2" ]]; then
   WSL2_IP=""
@@ -368,12 +379,12 @@ if [[ "$FORCE_UPGRADE" == "true" ]]; then
   $D pull "$OPENWEBUI_IMAGE" >/dev/null 2>&1 || true
 fi
 
-start_openwebui_container "$OPENWEBUI_URL" "$API_SERVER_KEY"
+start_openwebui_container "$OPENWEBUI_URL" "$API_SERVER_KEY" "$OPENWEBUI_HOST_PORT"
 
 # ─── Wait for Open WebUI health ───────────────────────────────────────
 info "Waiting for Open WebUI to be ready..."
 for i in $(seq 1 12); do
-  if curl -sf http://localhost:3000/health >/dev/null 2>&1; then
+  if curl -sf http://localhost:$OPENWEBUI_HOST_PORT/health >/dev/null 2>&1; then
     info "Open WebUI ready (attempt $i)"
     break
   fi
@@ -419,8 +430,8 @@ else
 fi
 echo ""
 echo "  Hermes API:   http://localhost:8642/v1"
-echo "  Open WebUI:   http://localhost:3000"
-echo "  AionUi WebUI: http://localhost:3001"
+echo "  Open WebUI:   http://localhost:$OPENWEBUI_HOST_PORT"
+echo "  AionUi WebUI: http://localhost:3000"
 echo ""
 echo "  ✅ ACP agents run natively on the host"
 echo "     └── Full access to: host filesystem, processes, network"

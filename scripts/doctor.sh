@@ -29,6 +29,13 @@ read_mode() {
   grep "^mode:" "$STATE_FILE" 2>/dev/null | cut -d: -f2
 }
 MODE="$(read_mode)"
+# Read stored Open WebUI port (from host.sh install)
+OPENWEBUI_PORT=""
+if [[ -f "$SETUP_DIR/ow_port" ]]; then
+  OPENWEBUI_PORT="$(cat "$SETUP_DIR/ow_port")"
+fi
+: "${OPENWEBUI_PORT:=3000}"
+
 [[ -n "$MODE" ]] && echo "  Mode: $MODE" || echo "  Mode: unknown"
 echo ""
 
@@ -78,10 +85,10 @@ fi
 # ─── Open WebUI ────────────────────────────────────────────────────────
 echo ""
 echo "--- Open WebUI ---"
-OW_UP=$(curl -sf http://localhost:3000/health 2>&1) && {
-  check "Open WebUI /health" "ok"
+OW_UP=$(curl -sf "http://localhost:${OPENWEBUI_PORT}/health" 2>&1) && {
+  check "Open WebUI /health (port ${OPENWEBUI_PORT})" "ok"
 } || {
-  check "Open WebUI /health" "fail" "$OW_UP"
+  check "Open WebUI /health (port ${OPENWEBUI_PORT})" "fail" "$OW_UP"
 }
 
 # ─── AionUi ────────────────────────────────────────────────────────────
@@ -93,10 +100,10 @@ if [[ "$MODE" == "host" ]]; then
   else
     check "AionUi process" "fail" "not running"
   fi
-  if timeout 2 bash -c 'echo > /dev/tcp/localhost/3001' 2>/dev/null; then
-    check "AionUi port 3001" "ok"
+  if timeout 2 bash -c 'echo > /dev/tcp/localhost/3000' 2>/dev/null; then
+    check "AionUi port 3000" "ok"
   else
-    check "AionUi port 3001" "fail" "not reachable"
+    check "AionUi port 3000" "fail" "not reachable"
   fi
   if [[ -d "$HOME/hermes-aionui" ]]; then
     check "AionUi source dir" "ok"
