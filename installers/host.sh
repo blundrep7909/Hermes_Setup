@@ -190,6 +190,10 @@ ensure_hermes_env
 # ─── Persist Mode ─────────────────────────────────────────────────────
 store_mode "host"
 
+# ─── Install system deps for AionUi ─────────────────────────────────
+info "Installing system dependencies for AionUi build..."
+sudo apt-get install -y libsecret-1-dev >/dev/null 2>&1 || true
+
 # ─── Install AionUi Natively ─────────────────────────────────────────
 if [[ "$DO_ROLLBACK" == "true" ]]; then
   rollback_step "aionui_build"

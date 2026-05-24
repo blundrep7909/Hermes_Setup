@@ -202,14 +202,14 @@ detect_existing_installation() {
 prompt_install_mode() {
   local detected="$1"
 
-  header "Existing Installation Detected"
-  echo ""
-  echo "  Components found:$detected"
-  echo ""
-  echo "  (U)pdate   — upgrade existing + install missing (default)"
-  echo "  (F)resh    — wipe everything, then clean install"
-  echo "  (C)ancel   — do nothing"
-  echo ""
+  header "Existing Installation Detected" >&2
+  echo "" >&2
+  echo "  Components found:$detected" >&2
+  echo "" >&2
+  echo "  (U)pdate   — upgrade existing + install missing (default)" >&2
+  echo "  (F)resh    — wipe everything, then clean install" >&2
+  echo "  (C)ancel   — do nothing" >&2
+  echo "" >&2
 
   if [[ "${UPDATE_FLAG:-false}" == "true" ]]; then
     echo "update"
@@ -218,14 +218,14 @@ prompt_install_mode() {
   elif [[ -t 0 ]]; then
     local REPLY
     while true; do
-      read -rp "  Choose [U/f/c]: " REPLY
+      read -rp "  Choose [U/f/c]: " REPLY >&2
       REPLY="${REPLY:-U}"
       case "${REPLY^^}" in
         U) echo "update"; return 0 ;;
         F) echo "fresh";  return 0 ;;
         C) echo "cancel"; return 0 ;;
       esac
-      echo "  Invalid — enter U, F, or C"
+      echo "  Invalid — enter U, F, or C" >&2
     done
   else
     echo "update"
@@ -291,22 +291,21 @@ start_openwebui_container() {
 
   $D rm -f open-webui >/dev/null 2>&1 || true
 
-  # Pre-wait for stale docker-proxy to release port 3000
-  local owner
-  owner=$(port_owner 3000)
-  if echo "$owner" | grep -qiE 'docker-proxy|docker'; then
-    warn "Stale docker-proxy holding port 3000 — waiting for release..."
-    for i in $(seq 1 20); do
-      sleep 3
-      owner=$(port_owner 3000)
-      echo "$owner" | grep -qiE 'docker-proxy|docker' || { info "Port 3000 released"; break; }
-    done
-  fi
+  # Wait for port 3000 to be Docker-bindable (Docker canary — works in WSL2)
+  info "Waiting for port 3000 to be available..."
+  for i in $(seq 1 20); do
+    if $D run --rm -p 3000:8080 alpine:3.19 true 2>/dev/null; then
+      break
+    fi
+    [[ $i -eq 20 ]] && error "Port 3000 still busy after 60s — try: sudo service docker restart" && exit 125
+    sleep 3
+  done
 
   info "Starting Open WebUI container..."
   local started=false
-  for attempt in $(seq 1 5); do
-    $D run -d \
+  for attempt in $(seq 1 10); do
+    local cid
+    cid=$($D run -d \
       --name open-webui \
       --restart unless-stopped \
       -p 3000:8080 \
@@ -316,18 +315,24 @@ start_openwebui_container() {
       -e OPENAI_API_KEY="$api_key" \
       -e BYPASS_MODEL_ACCESS_CONTROL=true \
       -e AIOHTTP_CLIENT_TIMEOUT=120 \
-      "$OPENWEBUI_IMAGE" >/dev/null 2>&1 || true
+      "$OPENWEBUI_IMAGE" 2>&1) || {
+      warn "Docker bind failed (attempt $attempt/10): $(echo "$cid" | tail -1)"
+      $D rm -f open-webui >/dev/null 2>&1 || true
+      sleep 10
+      continue
+    }
     if $D inspect --format='{{.State.Status}}' open-webui 2>/dev/null | grep -q running; then
       started=true
       break
     fi
-    warn "Port 3000 still busy (attempt $attempt/5) — retrying in 6s..."
-    sleep 6
+    warn "Container exited (attempt $attempt/10):"
+    $D logs open-webui 2>&1 | while IFS= read -r line; do warn "  $line"; done
     $D rm -f open-webui >/dev/null 2>&1 || true
+    sleep 10
   done
   if [[ "$started" != "true" ]]; then
-    error "Could not bind port 3000 after 5 attempts — another process is holding it"
-    error "  Try: sudo service docker restart  (frees stale docker-proxy ports)"
+    error "Could not start Open WebUI container after 10 attempts"
+    error "  Check logs above or try: sudo service docker restart"
     exit 125
   fi
   info "Open WebUI container started"
