@@ -144,22 +144,33 @@ port_check() {
   info "Port $port ($name): available"
 }
 
+port_owner() {
+  local port="$1"
+  local owner=""
+  if command -v ss &>/dev/null; then
+    owner=$(ss -tlnpH "sport = :$port" 2>/dev/null | head -1 | sed 's/.*users:(("//;s/".*//')
+    if [[ -z "$owner" ]] && sudo -n ss -tlnpH "sport = :$port" 2>/dev/null | head -1 | sed 's/.*users:(("//;s/".*//' 2>/dev/null; then
+      owner=$(sudo -n ss -tlnpH "sport = :$port" 2>/dev/null | head -1 | sed 's/.*users:(("//;s/".*//')
+    fi
+  elif command -v lsof &>/dev/null; then
+    owner=$(lsof -i :$port -sTCP:LISTEN 2>/dev/null | tail -1 | awk '{print $1}')
+    [[ -z "$owner" ]] && owner=$(sudo -n lsof -i :$port -sTCP:LISTEN 2>/dev/null | tail -1 | awk '{print $1}')
+  fi
+  echo "$owner"
+}
+
 preflight_port_check() {
   local any_busy=false
   for spec in 8642:Hermes 3000:OpenWebUI 3001:AionUi; do
     local port="${spec%%:*}"
     local name="${spec##*:}"
     if timeout 2 bash -c "echo > /dev/tcp/0.0.0.0/$port" 2>/dev/null; then
-      local owner=""
-      if command -v ss &>/dev/null; then
-        owner=$(ss -tlnpH "sport = :$port" 2>/dev/null | head -1 | sed 's/.*users:(("//;s/".*//')
-      elif command -v lsof &>/dev/null; then
-        owner=$(lsof -i :$port -sTCP:LISTEN 2>/dev/null | tail -1 | awk '{print $1}')
-      fi
+      local owner
+      owner=$(port_owner "$port")
       if [[ -n "$owner" ]]; then
         error "Port $port ($name) in use by: $owner"
       else
-        error "Port $port ($name) already in use"
+        error "Port $port ($name) already in use — check: sudo lsof -i :$port"
       fi
       any_busy=true
     fi
@@ -168,7 +179,6 @@ preflight_port_check() {
     echo ""
     info "Port conflict — installation blocked."
     info "  To free a port: kill the process or change the port assignment."
-    info "  Example: sudo lsof -i :3000  →  kill <PID>"
     exit 1
   fi
   info "All required ports (8642, 3000, 3001): available"
