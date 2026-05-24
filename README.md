@@ -3,6 +3,18 @@
 > **Deploy Hermes Agent + Open WebUI + AionUi in one command.**
 > Host-native or all-Docker — your choice. Hermes Agent is the single source of truth for provider/model config.
 
+## For AI Coding Assistants
+
+Start here. Then read these files in order for full session context:
+
+| Order | File | Why |
+|-------|------|-----|
+| 1 | `AGENTS.md` | Session context: architecture, environment, WSL2 caveats, known issues, avoid-mistakes, key commands |
+| 2 | `VERSION.md` | Version history: what's been fixed/added and why |
+| 3 | `scripts/doctor.sh` | Post-install validation logic (understand how components are verified) |
+| 4 | `scripts/uninstall.sh` | Cleanup logic (rollback steps, what gets removed) |
+| 5 | `.env.example` | Environment variables reference |
+
 ## Quick Install
 
 ### Host Mode — Hermes + AionUi native, Open WebUI in Docker
