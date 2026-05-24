@@ -27,6 +27,18 @@ echo ""
 
 validate_home
 
+# ─── OS / Docker detection (before port check — $D must be correct) ────
+OS="$(detect_os)"
+WSL="$(detect_wsl)"
+info "OS: $OS | Platform: $WSL"
+
+if [[ "$WSL" == "wsl2" ]]; then
+  warn "WSL2 detected. AionUi GUI won't work in Docker mode (no display)."
+  warn "  This is expected — AionUi runs headless in Docker."
+fi
+
+check_docker
+
 # ─── Pre-flight port check (BEFORE rollback — fail cleanly, no rollback)
 preflight_port_check
 
@@ -62,17 +74,6 @@ if [[ "$DO_ROLLBACK" == "true" ]]; then
   rollback_init
   rollback_step "detection"
 fi
-
-OS="$(detect_os)"
-WSL="$(detect_wsl)"
-info "OS: $OS | Platform: $WSL"
-
-if [[ "$WSL" == "wsl2" ]]; then
-  warn "WSL2 detected. AionUi GUI won't work in Docker mode (no display)."
-  warn "  This is expected — AionUi runs headless in Docker."
-fi
-
-check_docker
 
 # ─── Generate Credentials ─────────────────────────────────────────────
 rollback_step "keygen"

@@ -29,6 +29,19 @@ validate_home
 
 validate_home
 
+# ─── OS / Docker detection (before port check — $D must be correct) ────
+OS="$(detect_os)"
+WSL="$(detect_wsl)"
+info "OS: $OS | Platform: $WSL"
+
+if [[ "$WSL" == "wsl2" ]]; then
+  warn "WSL2 detected."
+  warn "  Hermes + AionUi will run natively in WSL2."
+  warn "  Open WebUI will run in Docker. Make sure Docker Desktop WSL2 backend is enabled."
+fi
+
+check_docker
+
 # ─── Pre-flight port check (BEFORE rollback — fail cleanly, no rollback)
 preflight_port_check
 
@@ -60,7 +73,6 @@ if [[ -n "$EXISTING" ]]; then
 fi
 
 # ─── Pre-Install Plan + Confirmation (normal/fresh only) ───────────────
-# Update mode user already chose U — no additional prompt needed
 if [[ "$INSTALL_MODE" != "update" ]]; then
   header "Pre-Install Plan — What will be installed on YOUR system"
   echo ""
@@ -100,18 +112,7 @@ if [[ "$DO_ROLLBACK" == "true" ]]; then
   rollback_step "detection"
 fi
 
-OS="$(detect_os)"
-WSL="$(detect_wsl)"
-info "OS: $OS | Platform: $WSL"
-
-if [[ "$WSL" == "wsl2" ]]; then
-  warn "WSL2 detected."
-  warn "  Hermes + AionUi will run natively in WSL2."
-  warn "  Open WebUI will run in Docker. Make sure Docker Desktop WSL2 backend is enabled."
-fi
-
 check_disk_space 3500
-check_docker
 
 rollback_step "systemd_check"
 check_systemd

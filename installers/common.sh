@@ -176,8 +176,12 @@ is_component_installed() {
       ;;
     openwebui)
       if command -v docker &>/dev/null; then
-        docker ps -a --format '{{.Names}}' 2>/dev/null | grep -q '^open-webui$' || \
-        sudo -n docker ps -a --format '{{.Names}}' 2>/dev/null | grep -q '^open-webui$'
+        if [[ -n "${D:-}" ]]; then
+          $D ps -a --format '{{.Names}}' 2>/dev/null | grep -q '^open-webui$'
+        else
+          docker ps -a --format '{{.Names}}' 2>/dev/null | grep -q '^open-webui$' || \
+          sudo -n docker ps -a --format '{{.Names}}' 2>/dev/null | grep -q '^open-webui$'
+        fi
       fi
       ;;
     aionui)
@@ -286,9 +290,22 @@ start_openwebui_container() {
   fi
 
   $D rm -f open-webui >/dev/null 2>&1 || true
+
+  # Pre-wait for stale docker-proxy to release port 3000
+  local owner
+  owner=$(port_owner 3000)
+  if echo "$owner" | grep -qiE 'docker-proxy|docker'; then
+    warn "Stale docker-proxy holding port 3000 — waiting for release..."
+    for i in $(seq 1 20); do
+      sleep 3
+      owner=$(port_owner 3000)
+      echo "$owner" | grep -qiE 'docker-proxy|docker' || { info "Port 3000 released"; break; }
+    done
+  fi
+
   info "Starting Open WebUI container..."
   local started=false
-  for attempt in 1 2 3 4 5; do
+  for attempt in $(seq 1 5); do
     $D run -d \
       --name open-webui \
       --restart unless-stopped \
@@ -304,12 +321,13 @@ start_openwebui_container() {
       started=true
       break
     fi
-    warn "Port 3000 still busy (attempt $attempt/5) — retrying in 3s..."
-    sleep 3
+    warn "Port 3000 still busy (attempt $attempt/5) — retrying in 6s..."
+    sleep 6
     $D rm -f open-webui >/dev/null 2>&1 || true
   done
   if [[ "$started" != "true" ]]; then
     error "Could not bind port 3000 after 5 attempts — another process is holding it"
+    error "  Try: sudo service docker restart  (frees stale docker-proxy ports)"
     exit 125
   fi
   info "Open WebUI container started"
