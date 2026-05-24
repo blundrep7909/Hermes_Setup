@@ -292,17 +292,30 @@ if $D ps --format '{{.Names}}' 2>/dev/null | grep -q '^open-webui$'; then
 else
   $D rm -f open-webui 2>/dev/null || true
   info "Starting Open WebUI container..."
-  $D run -d \
-    --name open-webui \
-    --restart unless-stopped \
-    -p 3000:8080 \
-    --add-host host.docker.internal:host-gateway \
-    -v open-webui-data:/app/backend/data \
-    -e OPENAI_API_BASE_URL="$OPENWEBUI_URL" \
-    -e OPENAI_API_KEY="$API_SERVER_KEY" \
-    -e BYPASS_MODEL_ACCESS_CONTROL=true \
-    -e AIOHTTP_CLIENT_TIMEOUT=120 \
-    "$OPENWEBUI_IMAGE"
+  local openwebui_started=false
+  for attempt in 1 2 3 4 5; do
+    if $D run -d \
+      --name open-webui \
+      --restart unless-stopped \
+      -p 3000:8080 \
+      --add-host host.docker.internal:host-gateway \
+      -v open-webui-data:/app/backend/data \
+      -e OPENAI_API_BASE_URL="$OPENWEBUI_URL" \
+      -e OPENAI_API_KEY="$API_SERVER_KEY" \
+      -e BYPASS_MODEL_ACCESS_CONTROL=true \
+      -e AIOHTTP_CLIENT_TIMEOUT=120 \
+      "$OPENWEBUI_IMAGE" 2>/dev/null; then
+      openwebui_started=true
+      break
+    fi
+    warn "Port 3000 still busy (attempt $attempt/5) — retrying in 3s..."
+    sleep 3
+    $D rm -f open-webui 2>/dev/null || true
+  done
+  if [[ "$openwebui_started" != "true" ]]; then
+    error "Could not bind port 3000 after 5 attempts — another process is holding it"
+    exit 125
+  fi
 fi
 
 # ─── Wait for Open WebUI health ───────────────────────────────────────
