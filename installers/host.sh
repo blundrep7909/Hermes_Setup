@@ -304,7 +304,7 @@ else
       -e OPENAI_API_KEY="$API_SERVER_KEY" \
       -e BYPASS_MODEL_ACCESS_CONTROL=true \
       -e AIOHTTP_CLIENT_TIMEOUT=120 \
-      "$OPENWEBUI_IMAGE" >/dev/null 2>&1
+      "$OPENWEBUI_IMAGE" >/dev/null 2>&1 || true
     if $D inspect --format='{{.State.Status}}' open-webui 2>/dev/null | grep -q running; then
       openwebui_started=true
       break
