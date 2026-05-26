@@ -104,6 +104,12 @@ if [[ "$INSTALL_MODE" != "update" ]]; then
   fi
 fi
 
+# ─── Cache sudo credentials (one password prompt, not many) ────────
+if [[ -t 0 ]]; then
+  info "One-time sudo authentication required for system-level changes..."
+  sudo -v 2>&1 || warn "sudo not available or cancelled — system-level steps may fail"
+fi
+
 # ─── Prerequisites ─────────────────────────────────────────────────────
 if [[ "$DO_ROLLBACK" == "true" ]]; then
   rollback_init
