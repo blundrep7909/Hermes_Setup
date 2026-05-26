@@ -39,9 +39,16 @@ git clone --depth=1 https://github.com/blundrep7909/Hermes_Setup.git ~/Hermes_Se
 
 **Docker is auto-installed** if not found.
 
+## Quick Uninstall
+
+```bash
+# From GitHub — no clone needed, leaves no trace
+curl -sSL https://raw.githubusercontent.com/blundrep7909/Hermes_Setup/main/scripts/uninstall.sh | bash -s -- --force
+```
+
 > 📁 The cloned repo at `~/Hermes_Setup/` is used for management commands:
 > `bash ~/Hermes_Setup/scripts/doctor.sh`, `uninstall.sh`, `update.sh`, `backup.sh`.
-> Keep it around — it's only ~200KB.
+> Keep it around — it's only ~200KB. Or use curl one-liners (below) to manage without a clone.
 
 ## Architecture
 
@@ -92,7 +99,7 @@ Docker:
 
 ## Management
 
-All commands below run from the cloned repo directory (`~/Hermes_Setup/`). Auto-detect host or docker mode from `~/.hermes-setup/state`.
+Commands can run from the cloned repo (`~/Hermes_Setup/`) or via curl for clone-free management. Auto-detect host or docker mode from `~/.hermes-setup/state`.
 
 ### Update
 
@@ -131,12 +138,24 @@ BACKUP_DIR=/path/to/backups bash ~/Hermes_Setup/scripts/backup.sh
 
 ### Uninstall
 
+**From the repo** (if you still have the clone):
 ```bash
 # Interactive (asks confirmation, preserves data by default)
 bash ~/Hermes_Setup/scripts/uninstall.sh [--host | --docker]
 
 # Delete everything without asking
 bash ~/Hermes_Setup/scripts/uninstall.sh --force
+
+# With --force, the repo itself is also auto-removed
+```
+
+**From GitHub (no clone needed)**:
+```bash
+# Interactive
+curl -sSL https://raw.githubusercontent.com/blundrep7909/Hermes_Setup/main/scripts/uninstall.sh | bash -s -- [--host | --docker]
+
+# Delete everything — one-liner, no trace left
+curl -sSL https://raw.githubusercontent.com/blundrep7909/Hermes_Setup/main/scripts/uninstall.sh | bash -s -- --force
 ```
 
 | What gets removed | Without `--force` | With `--force` |
@@ -147,6 +166,7 @@ bash ~/Hermes_Setup/scripts/uninstall.sh --force
 | Docker volumes (data) | ❌ Asks first | ✅ Deleted |
 | Hermes venv (`~/.hermes-venv/`) | ⚠️ Host mode only | ⚠️ Host mode only |
 | AionUi source (`~/hermes-aionui/`) | ❌ Asks first | ✅ Deleted |
+| Repo (`~/Hermes_Setup/`) | ❌ Asks first | ✅ Deleted |
 
 ### Daily Operations
 
