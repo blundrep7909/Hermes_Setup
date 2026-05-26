@@ -370,13 +370,8 @@ if [[ "$DO_ROLLBACK" == "true" ]]; then
   rollback_step "docker_run"
 fi
 
-# --- Detect AionUi port for Open WebUI port assignment ---
-OPENWEBUI_HOST_PORT=3000
-if timeout 2 bash -c 'echo > /dev/tcp/0.0.0.0/3000' 2>/dev/null; then
-  # Port 3000 is taken (likely by AionUi native) — map Open WebUI to 3001
-  OPENWEBUI_HOST_PORT=3001
-  echo "Open WebUI will use port 3001 (port 3000 in use)"
-fi
+# --- Auto-detect available ports ---
+OPENWEBUI_HOST_PORT=$(find_available_port 3000 3010)
 echo "$OPENWEBUI_HOST_PORT" > "$SETUP_DIR/ow_port"
 info "Open WebUI host port: $OPENWEBUI_HOST_PORT"
 

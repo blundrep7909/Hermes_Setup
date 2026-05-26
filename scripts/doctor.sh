@@ -29,12 +29,18 @@ read_mode() {
   grep "^mode:" "$STATE_FILE" 2>/dev/null | cut -d: -f2
 }
 MODE="$(read_mode)"
-# Read stored Open WebUI port (from host.sh install)
+# Read stored ports
 OPENWEBUI_PORT=""
 if [[ -f "$SETUP_DIR/ow_port" ]]; then
   OPENWEBUI_PORT="$(cat "$SETUP_DIR/ow_port")"
 fi
 : "${OPENWEBUI_PORT:=3000}"
+
+AIONUI_PORT=""
+if [[ -f "$SETUP_DIR/ai_port" ]]; then
+  AIONUI_PORT="$(cat "$SETUP_DIR/ai_port")"
+fi
+: "${AIONUI_PORT:=3000}"
 
 [[ -n "$MODE" ]] && echo "  Mode: $MODE" || echo "  Mode: unknown"
 echo ""
@@ -100,10 +106,10 @@ if [[ "$MODE" == "host" ]]; then
   else
     check "AionUi process" "fail" "not running"
   fi
-  if timeout 2 bash -c 'echo > /dev/tcp/localhost/3000' 2>/dev/null; then
-    check "AionUi port 3000" "ok"
+  if timeout 2 bash -c "echo > /dev/tcp/localhost/$AIONUI_PORT" 2>/dev/null; then
+    check "AionUi port $AIONUI_PORT" "ok"
   else
-    check "AionUi port 3000" "fail" "not reachable"
+    check "AionUi port $AIONUI_PORT" "fail" "not reachable"
   fi
   if [[ -d "$HOME/hermes-aionui" ]]; then
     check "AionUi source dir" "ok"
@@ -115,17 +121,17 @@ if [[ "$MODE" == "host" ]]; then
     echo "    AionUi runtime data: $HOME/.config/AionUi/"
   fi
 else
-  if timeout 2 bash -c 'echo > /dev/tcp/localhost/3001' 2>/dev/null; then
-    check "AionUi port 3001" "ok"
+  if timeout 2 bash -c "echo > /dev/tcp/localhost/$AIONUI_PORT" 2>/dev/null; then
+    check "AionUi port $AIONUI_PORT" "ok"
   else
-    check "AionUi port 3001" "fail" "not reachable"
+    check "AionUi port $AIONUI_PORT" "fail" "not reachable"
   fi
 fi
 
 # ─── Port Conflicts ────────────────────────────────────────────────────
 echo ""
 echo "--- Port Conflicts ---"
-for port in 8642 3000 3001; do
+for port in 8642 "$OPENWEBUI_PORT" "$AIONUI_PORT"; do
   OWNER=$(ss -tlnpH "sport = :$port" 2>/dev/null | head -1 | awk '{print $6}' || true)
   if [[ -n "$OWNER" ]]; then
     echo "  Port $port: in use by $OWNER"

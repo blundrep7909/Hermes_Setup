@@ -93,6 +93,13 @@ ensure_hermes_env
 # ─── Persist Mode ─────────────────────────────────────────────────────
 store_mode "docker"
 
+# ─── Auto-detect available ports ──────────────────────────────────────
+AIONUI_PORT=$(find_available_port 3000 3010)
+OPENWEBUI_PORT=$(find_available_port 3001 3010 "$AIONUI_PORT")
+export AIONUI_PORT OPENWEBUI_PORT
+echo "$OPENWEBUI_PORT" > "$SETUP_DIR/ow_port"
+echo "$AIONUI_PORT" > "$SETUP_DIR/ai_port"
+
 # ─── Deploy Containers ────────────────────────────────────────────────
 if [[ "$FORCE_UPGRADE" == "true" ]]; then
   info "Pulling latest images..."
@@ -142,8 +149,8 @@ else
   echo "  Mode:         Docker (all 3 in containers)"
 fi
 echo "  Hermes API:   http://localhost:8642/v1"
-echo "  Open WebUI:   http://localhost:3000"
-echo "  AionUi:       http://localhost:3001"
+echo "  Open WebUI:   http://localhost:${OPENWEBUI_PORT:-3000}"
+echo "  AionUi:       http://localhost:${AIONUI_PORT:-3001}"
 echo ""
 echo "  To configure providers:"
 echo "    docker exec -it hermes /opt/hermes/.venv/bin/hermes setup"
