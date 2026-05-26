@@ -370,9 +370,8 @@ if [[ "$DO_ROLLBACK" == "true" ]]; then
   rollback_step "docker_run"
 fi
 
-# --- Auto-detect available ports ---
-# In host mode, AionUi runs natively on 3000 — skip it for Open WebUI
-OPENWEBUI_HOST_PORT=$(find_available_port 3001 3010)
+# --- Open WebUI port (host mode: 3001 — AionUi native uses 3000) ---
+OPENWEBUI_HOST_PORT=3001
 echo "$OPENWEBUI_HOST_PORT" > "$SETUP_DIR/ow_port"
 info "Open WebUI host port: $OPENWEBUI_HOST_PORT"
 

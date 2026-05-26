@@ -286,30 +286,15 @@ prompt_install_mode() {
   fi
 }
 
-# ─── Find next available port ─────────────────────────────────────
-find_available_port() {
-  local base="${1:-3000}" max="${2:-3010}"
-  local d_cmd="${D:-docker}"
-  for port in $(seq "$base" "$max"); do
-    if timeout 1 bash -c "echo > /dev/tcp/0.0.0.0/$port" 2>/dev/null; then
-      continue
-    fi
-    if command -v docker &>/dev/null; then
-      if ! $d_cmd run --rm -p "${port}:8080" alpine:3.19 true 2>/dev/null; then
-        continue
-      fi
-    fi
-    echo "$port"; return 0
-  done
-  echo "$base"; return 1
-}
-
 # ─── Port Preflight ─────────────────────────────────────────────────
 preflight_port_check() {
   local mode="${1:-docker}"
   local any_busy=false any_ours=false
-  # Only check Hermes API port (8642) — other ports are auto-assigned
-  ports="8642:Hermes"
+  if [[ "$mode" == "host" ]]; then
+    ports="8642:Hermes 3000:AionUi 3001:OpenWebUI"
+  else
+    ports="8642:Hermes 3000:OpenWebUI 3001:AionUi"
+  fi
   for spec in $ports; do
     local port="${spec%%:*}"
     local name="${spec##*:}"
@@ -321,10 +306,11 @@ preflight_port_check() {
       else
         local owner; owner=$(port_owner "$port")
         if [[ -n "$owner" ]]; then
-          warn "Port $port ($name) in use by: $owner — will auto-assign a different port"
+          error "Port $port ($name) in use by: $owner"
         else
-          warn "Port $port ($name) already in use — will auto-assign a different port"
+          error "Port $port ($name) already in use — check: sudo lsof -i :$port"
         fi
+        any_busy=true
       fi
 
     elif [[ "$port" == "3000" ]] && [[ -n "${D:-}" ]]; then
@@ -341,7 +327,9 @@ preflight_port_check() {
   done
   if [[ "$any_busy" == "true" ]]; then
     echo ""
-    warn "Some ports were busy — auto-assigning available ports."
+    error "Port conflict — installation blocked."
+    error "  Free the port or change the port assignment before retrying."
+    exit 1
   fi
   if [[ "$any_ours" == "true" ]]; then
     echo ""

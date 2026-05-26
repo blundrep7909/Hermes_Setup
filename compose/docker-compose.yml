@@ -22,7 +22,7 @@ services:
     container_name: open-webui
     restart: unless-stopped
     ports:
-      - "${OPENWEBUI_PORT:-3000}:8080"
+      - "3000:8080"
     volumes:
       - open-webui-data:/app/backend/data
     environment:
@@ -44,7 +44,7 @@ services:
     container_name: aionui
     restart: unless-stopped
     ports:
-      - "${AIONUI_PORT:-3001}:3001"
+      - "3001:3001"
     volumes:
       - aionui-data:/data
       - ~/.hermes:/opt/data:ro
