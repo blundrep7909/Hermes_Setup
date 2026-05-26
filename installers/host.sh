@@ -371,7 +371,8 @@ if [[ "$DO_ROLLBACK" == "true" ]]; then
 fi
 
 # --- Auto-detect available ports ---
-OPENWEBUI_HOST_PORT=$(find_available_port 3000 3010)
+# In host mode, AionUi runs natively on 3000 — skip it for Open WebUI
+OPENWEBUI_HOST_PORT=$(find_available_port 3001 3010)
 echo "$OPENWEBUI_HOST_PORT" > "$SETUP_DIR/ow_port"
 info "Open WebUI host port: $OPENWEBUI_HOST_PORT"
 
