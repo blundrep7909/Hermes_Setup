@@ -244,8 +244,22 @@ if [[ "$RESIDUE" == "false" ]]; then
   info "Clean uninstall — no Hermes Stack residue found."
 fi
 
+# ─── Repo self-removal ────────────────────────────────────────────
+REPO_DIR="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PROJECT_DIR")"
+if [[ -d "$REPO_DIR" ]]; then
+  if [[ "$FORCE" == "true" ]]; then
+    rm -rf "$REPO_DIR"
+    info "Repo removed ($REPO_DIR)."
+  else
+    echo ""
+    read -rp "Also remove the Hermes_Setup repo ($REPO_DIR)? [y/N] " REPLY
+    if [[ "$REPLY" =~ ^[Yy]$ ]]; then
+      rm -rf "$REPO_DIR"
+      info "Repo removed ($REPO_DIR)."
+    fi
+  fi
+fi
+
 echo ""
 header "Uninstall complete"
-echo ""
-echo "  To remove the repo itself: rm -rf $(git rev-parse --show-toplevel 2>/dev/null || echo "$PROJECT_DIR")"
 echo ""
