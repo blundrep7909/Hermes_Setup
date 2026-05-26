@@ -232,6 +232,8 @@ if [[ -d "$AIONUI_DIR" ]]; then
     info "Updating AionUi from git..."
     (cd "$AIONUI_DIR" && git pull)
     "$BUN_BIN" install --cwd "$AIONUI_DIR"
+    info "Downloading aioncore backend binary..."
+    (cd "$AIONUI_DIR" && node scripts/prepareAioncore.js) || warn "aioncore download failed — AionUi WebUI may not start"
     "$BUN_BIN" run --cwd "$AIONUI_DIR" package
   else
     info "AionUi directory exists at $AIONUI_DIR"
@@ -245,6 +247,8 @@ else
   git clone --depth=1 https://github.com/iOfficeAI/AionUi.git "$AIONUI_DIR"
   info "Installing dependencies (this may take a minute)..."
   "$BUN_BIN" install --cwd "$AIONUI_DIR"
+  info "Downloading aioncore backend binary..."
+  (cd "$AIONUI_DIR" && node scripts/prepareAioncore.js) || warn "aioncore download failed — AionUi WebUI may not start"
   info "Building AionUi..."
   "$BUN_BIN" run --cwd "$AIONUI_DIR" package
 fi

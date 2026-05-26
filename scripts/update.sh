@@ -83,6 +83,8 @@ if [[ "$MODE" == "host" ]]; then
       git -C "$AIONUI_DIR" pull --ff-only 2>/dev/null || warn "git pull failed, skipping AionUi update"
       info "Rebuilding AionUi..."
       "$BUN_BIN" install --cwd "$AIONUI_DIR"
+      info "Downloading aioncore backend binary..."
+      (cd "$AIONUI_DIR" && node scripts/prepareAioncore.js) || warn "aioncore download failed — AionUi WebUI may not start"
       "$BUN_BIN" run --cwd "$AIONUI_DIR" package
 
       if systemctl --user is-active aionui-webui &>/dev/null 2>&1; then
