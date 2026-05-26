@@ -87,6 +87,20 @@ if [[ "$MODE" == "host" ]]; then
       (cd "$AIONUI_DIR" && node scripts/prepareAioncore.js) || warn "aioncore download failed — AionUi WebUI may not start"
       "$BUN_BIN" run --cwd "$AIONUI_DIR" package
 
+      info "Regenerating AionUi startup script..."
+      cat > "$SETUP_DIR/aionui-start.sh" << 'AIONUI_UPDATE_EOF'
+#!/usr/bin/env bash
+export PATH="$HOME/.bun/bin:$PATH"
+BUN_BIN=""
+for b in "$HOME/.bun/bin/bun" "/usr/local/bin/bun" "/opt/homebrew/bin/bun"; do
+  [[ -x "$b" ]] && { BUN_BIN="$b"; break; }
+done
+[[ -z "$BUN_BIN" ]] && BUN_BIN="$HOME/.bun/bin/bun"
+cd "$HOME/hermes-aionui" && exec env AIONUI_PORT=3001 "$BUN_BIN" run webui:prod
+AIONUI_UPDATE_EOF
+      chmod +x "$SETUP_DIR/aionui-start.sh"
+      echo "3001" > "$SETUP_DIR/ai_port" 2>/dev/null || true
+
       if systemctl --user is-active aionui-webui &>/dev/null 2>&1; then
         info "Restarting AionUi..."
         systemctl --user restart aionui-webui
