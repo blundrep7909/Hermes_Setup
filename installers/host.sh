@@ -278,7 +278,7 @@ for b in "\$HOME/.bun/bin/bun" "/usr/local/bin/bun" "/opt/homebrew/bin/bun"; do
   [[ -x "\$b" ]] && { BUN_BIN="\$b"; break; }
 done
 [[ -z "\$BUN_BIN" ]] && BUN_BIN="\$HOME/.bun/bin/bun"
-cd "\$HOME/hermes-aionui" && exec "\$BUN_BIN" run webui:prod
+cd "\$HOME/hermes-aionui" && exec env AIONUI_PORT=3001 "\$BUN_BIN" run webui:prod
 AIONUI_START_EOF
 chmod +x "$SETUP_DIR/aionui-start.sh"
 
@@ -370,9 +370,10 @@ if [[ "$DO_ROLLBACK" == "true" ]]; then
   rollback_step "docker_run"
 fi
 
-# --- Open WebUI port (host mode: 3001 — AionUi native uses 3000) ---
-OPENWEBUI_HOST_PORT=3001
+# --- Ports: Open WebUI :3000, AionUi :3001 (native via AIONUI_PORT) ---
+OPENWEBUI_HOST_PORT=3000
 echo "$OPENWEBUI_HOST_PORT" > "$SETUP_DIR/ow_port"
+echo "3001" > "$SETUP_DIR/ai_port"
 info "Open WebUI host port: $OPENWEBUI_HOST_PORT"
 
 OPENWEBUI_URL="http://host.docker.internal:8642/v1"
@@ -441,8 +442,8 @@ else
 fi
 echo ""
 echo "  Hermes API:   http://localhost:8642/v1"
-echo "  Open WebUI:   http://localhost:$OPENWEBUI_HOST_PORT"
-echo "  AionUi WebUI: http://localhost:3000"
+echo "  Open WebUI:   http://localhost:3000"
+echo "  AionUi WebUI: http://localhost:3001"
 echo ""
 echo "  ✅ ACP agents run natively on the host"
 echo "     └── Full access to: host filesystem, processes, network"

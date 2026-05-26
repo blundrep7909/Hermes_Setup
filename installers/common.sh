@@ -288,13 +288,8 @@ prompt_install_mode() {
 
 # ─── Port Preflight ─────────────────────────────────────────────────
 preflight_port_check() {
-  local mode="${1:-docker}"
   local any_busy=false any_ours=false
-  if [[ "$mode" == "host" ]]; then
-    ports="8642:Hermes 3000:AionUi 3001:OpenWebUI"
-  else
-    ports="8642:Hermes 3000:OpenWebUI 3001:AionUi"
-  fi
+  ports="8642:Hermes 3000:OpenWebUI 3001:AionUi"
   for spec in $ports; do
     local port="${spec%%:*}"
     local name="${spec##*:}"
