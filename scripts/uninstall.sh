@@ -51,16 +51,36 @@ if [[ -z "$MODE" ]]; then
   MODE="$(read_mode)"
 fi
 
+if [[ -z "$MODE" ]]; then
+  # Auto-detect: check what's actually installed (works even without state file)
+  if command -v systemctl &>/dev/null; then
+    if systemctl --user is-active hermes-gateway aionui-webui &>/dev/null 2>&1; then
+      MODE="host"
+    fi
+  fi
+  if [[ -z "$MODE" && -d "$HOME/.hermes" ]]; then
+    MODE="host"
+  fi
+  if [[ -z "$MODE" && -d "$HOME/.hermes-venv" ]]; then
+    MODE="host"
+  fi
+  if [[ -z "$MODE" && -d "$HOME/hermes-aionui" ]]; then
+    MODE="host"
+  fi
+  if [[ -z "$MODE" ]] && $D ps -a --format '{{.Names}}' 2>/dev/null | grep -q 'hermes\|aionui\|open-webui'; then
+    MODE="docker"
+  fi
+fi
+
 case "$MODE" in
-  host|docker) ;;
+  host)   header "Uninstall — host mode" ;;
+  docker) header "Uninstall — docker mode" ;;
   *)
-    error "Cannot detect installation mode."
-    echo "Usage: bash $0 [--host | --docker] [--force]"
-    exit 1
+    header "Uninstall — Hermes Stack"
+    info "No state file found. Will auto-detect and remove any Hermes components."
     ;;
 esac
 
-header "Uninstall — $MODE mode"
 warn "This will remove Hermes Stack components and optionally all data."
 echo ""
 
@@ -91,35 +111,36 @@ else
   DELETE_DATA=true
 fi
 
-# ─── Stop Services (host mode) ─────────────────────────────────────
-if [[ "$MODE" == "host" ]]; then
-  header "Stopping services"
-  if command -v systemctl &>/dev/null && systemctl --user list-units --quiet &>/dev/null 2>&1; then
-    for svc in aionui-webui hermes-gateway; do
-      if systemctl --user is-active "$svc" &>/dev/null 2>&1; then
-        systemctl --user disable --now "$svc" 2>/dev/null || true
-        info "Stopped $svc (systemd)"
-      fi
-    done
-    rm -f "$HOME/.config/systemd/user/hermes-gateway.service" \
-          "$HOME/.config/systemd/user/aionui-webui.service" 2>/dev/null || true
-    systemctl --user daemon-reload 2>/dev/null || true
-  fi
-  # Kill nohup processes via PID file (whether systemd was used or not)
-  for pid_file in "$SETUP_DIR/pids/hermes-gateway.pid" "$SETUP_DIR/pids/aionui-webui.pid"; do
-    if [[ -f "$pid_file" ]]; then
-      kill "$(cat "$pid_file")" 2>/dev/null || true
-      rm -f "$pid_file"
-      info "Killed nohup process ($(basename "$pid_file" .pid))"
+# ─── Stop Services ────────────────────────────────────────────────
+header "Stopping services"
+
+# Try systemd (host mode)
+if command -v systemctl &>/dev/null && systemctl --user list-units --quiet &>/dev/null 2>&1; then
+  for svc in aionui-webui hermes-gateway; do
+    if systemctl --user is-active "$svc" &>/dev/null 2>&1; then
+      systemctl --user disable --now "$svc" 2>/dev/null || true
+      info "Stopped $svc (systemd)"
     fi
   done
-else
-  header "Stopping containers"
+  rm -f "$HOME/.config/systemd/user/hermes-gateway.service" \
+        "$HOME/.config/systemd/user/aionui-webui.service" 2>/dev/null || true
+  systemctl --user daemon-reload 2>/dev/null || true
+fi
+
+# Kill nohup processes via PID file
+for pid_file in "$SETUP_DIR/pids/hermes-gateway.pid" "$SETUP_DIR/pids/aionui-webui.pid"; do
+  if [[ -f "$pid_file" ]]; then
+    kill "$(cat "$pid_file")" 2>/dev/null || true
+    rm -f "$pid_file"
+    info "Killed nohup process ($(basename "$pid_file" .pid))"
+  fi
+done
+
+# Try docker compose (docker mode)
+if [[ -f "$COMPOSE_FILE" ]]; then
   if $DC -f "$COMPOSE_FILE" ps --services --filter "status=running" 2>/dev/null | grep -q .; then
     $DC -f "$COMPOSE_FILE" down --remove-orphans
     info "Containers stopped and removed."
-  else
-    info "No running containers found."
   fi
 fi
 
@@ -164,29 +185,26 @@ if [[ "$DELETE_DATA" == "true" ]]; then
   fi
 fi
 
-# ─── Hermes venv (host mode) ───────────────────────────────────────
-if [[ "$MODE" == "host" ]]; then
-  if [[ -d "$HOME/.hermes-venv" ]]; then
-    rm -rf "$HOME/.hermes-venv"
-    info "Hermes venv ~/.hermes-venv removed."
-  fi
+# ─── Clean up host-mode leftovers (check actual paths, not state) ──
+if [[ -d "$HOME/.hermes-venv" ]]; then
+  rm -rf "$HOME/.hermes-venv"
+  info "Hermes venv ~/.hermes-venv removed."
+fi
 
-  if [[ -d "$HOME/hermes-aionui" ]]; then
-    rm -rf "$HOME/hermes-aionui"
-    info "AionUi source ~/hermes-aionui removed."
-  fi
+if [[ -d "$HOME/hermes-aionui" ]]; then
+  rm -rf "$HOME/hermes-aionui"
+  info "AionUi source ~/hermes-aionui removed."
+fi
 
-  # Fix #4: remove symlink
-  rm -f "$HOME/.local/bin/hermes" 2>/dev/null || true
+rm -f "$HOME/.local/bin/hermes" 2>/dev/null || true
 
-  # Fix #3: marker-based shell rc cleanup (safe block removal)
-  RC_MARKER_START="# --- Hermes Setup (auto-generated, do not edit) ---"
-  RC_MARKER_END="# --- /Hermes Setup ---"
-  for rc_file in "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.profile"; do
-    if [[ -f "$rc_file" ]]; then
-      sed -i "/^${RC_MARKER_START}$/,/^${RC_MARKER_END}$/d" "$rc_file" 2>/dev/null || true
-      # Clean up any leftover blank lines from deletion
-      python3 -c "
+# Marker-based shell rc cleanup (safe block removal)
+RC_MARKER_START="# --- Hermes Setup (auto-generated, do not edit) ---"
+RC_MARKER_END="# --- /Hermes Setup ---"
+for rc_file in "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.profile"; do
+  if [[ -f "$rc_file" ]]; then
+    sed -i "/^${RC_MARKER_START}$/,/^${RC_MARKER_END}$/d" "$rc_file" 2>/dev/null || true
+    python3 -c "
 import sys
 p = '$rc_file'
 with open(p) as f: lines = f.readlines()
@@ -198,9 +216,8 @@ for l in lines:
     prev_blank = b
 with open(p, 'w') as f: f.writelines(res)
 " 2>/dev/null || true
-    fi
-  done
-fi
+  fi
+done
 
 # ─── Revert systemd linger (fix #1) ─────────────────────────────────
 if command -v loginctl &>/dev/null; then
