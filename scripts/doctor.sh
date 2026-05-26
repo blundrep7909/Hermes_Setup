@@ -100,10 +100,10 @@ if [[ "$MODE" == "host" ]]; then
   else
     check "AionUi process" "fail" "not running"
   fi
-  if timeout 2 bash -c 'echo > /dev/tcp/localhost/3000' 2>/dev/null; then
-    check "AionUi port 3000" "ok"
+  if timeout 2 bash -c 'echo > /dev/tcp/localhost/3001' 2>/dev/null; then
+    check "AionUi port 3001" "ok"
   else
-    check "AionUi port 3000" "fail" "not reachable"
+    check "AionUi port 3001" "fail" "not reachable"
   fi
   if [[ -d "$HOME/hermes-aionui" ]]; then
     check "AionUi source dir" "ok"
