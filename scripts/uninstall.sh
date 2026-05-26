@@ -19,21 +19,13 @@ if [[ -z "${HOME:-}" || "$HOME" == "/" ]]; then
   exit 1
 fi
 
-# ─── Docker Permission Setup (same as installer) ─────────────────────────
+# ─── Docker Permission Setup ─────────────────────────────────────────────
 D="docker"
 DC="docker compose"
-check_docker_uninstall() {
-  if command -v docker &>/dev/null; then
-    if ! docker info &>/dev/null 2>&1; then
-      local user="$(whoami)"
-      if sudo -u "$user" docker info &>/dev/null 2>&1; then
-        D="sudo -u $user docker"
-        DC="sudo -u $user docker compose"
-      fi
-    fi
-  fi
-}
-check_docker_uninstall || true
+if command -v docker &>/dev/null && ! docker info &>/dev/null 2>&1; then
+  D="sudo docker"
+  DC="sudo docker compose"
+fi
 
 read_mode() {
   grep "^mode:" "$STATE_FILE" 2>/dev/null | cut -d: -f2
@@ -144,10 +136,10 @@ if [[ "$DELETE_DATA" == "true" ]]; then
     fi
   done
 
-  # Remove Docker images
-  $D rmi ghcr.io/anomalyco/hermes-agent:0.14.11 2>/dev/null || true
-  $D rmi ghcr.io/open-webui/open-webui:latest 2>/dev/null || true
-  $D rmi hermes-setup-aionui 2>/dev/null || true
+  # Remove Docker images (match by prefix so version bumps don't orphan them)
+  $D images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep -E 'ghcr\.io/(anomalyco/hermes-agent|open-webui/open-webui)|hermes-setup-aionui' | while read -r img; do
+    $D rmi "$img" 2>/dev/null || true
+  done
 
   # Hermes config
   if [[ -d "$HOME/.hermes" ]]; then
@@ -189,16 +181,28 @@ if [[ "$MODE" == "host" ]]; then
     if [[ -f "$rc_file" ]]; then
       sed -i "/^${RC_MARKER_START}$/,/^${RC_MARKER_END}$/d" "$rc_file" 2>/dev/null || true
       # Clean up any leftover blank lines from deletion
-      sed -i '/^$/N;/^\n$/D' "$rc_file" 2>/dev/null || true
+      python3 -c "
+import sys
+p = '$rc_file'
+with open(p) as f: lines = f.readlines()
+res = []
+prev_blank = False
+for l in lines:
+    b = l.strip() == ''
+    if not (b and prev_blank): res.append(l)
+    prev_blank = b
+with open(p, 'w') as f: f.writelines(res)
+" 2>/dev/null || true
     fi
   done
 fi
 
 # ─── Revert systemd linger (fix #1) ─────────────────────────────────
 if command -v loginctl &>/dev/null; then
-  if sudo loginctl show-user "$(whoami)" 2>/dev/null | grep -q "Linger=yes"; then
-    sudo loginctl disable-linger "$(whoami)" 2>/dev/null || true
-    info "Systemd linger disabled (reverted system-level change)."
+  if loginctl show-user "$(whoami)" 2>/dev/null | grep -q "Linger=yes"; then
+    if sudo -n loginctl disable-linger "$(whoami)" 2>/dev/null; then
+      info "Systemd linger disabled (reverted system-level change)."
+    fi
   fi
 fi
 
@@ -217,22 +221,27 @@ check_residue() {
   fi
 }
 
-check_residue "$HOME/.hermes" "Hermes config"
-check_residue "$HOME/.hermes-venv" "Hermes venv"
-check_residue "$HOME/hermes-aionui" "AionUi source"
-check_residue "$HOME/.hermes-setup" "Setup metadata"
-check_residue "$HOME/.local/bin/hermes" "Hermes symlink"
-check_residue "$HOME/.config/AionUi" "AionUi runtime data"
-check_residue "$HOME/.config/systemd/user/hermes-gateway.service" "Systemd unit (hermes)"
-check_residue "$HOME/.config/systemd/user/aionui-webui.service" "Systemd unit (aionui)"
+if [[ "$DELETE_DATA" == "true" ]]; then
+  check_residue "$HOME/.hermes" "Hermes config"
+  check_residue "$HOME/.hermes-venv" "Hermes venv"
+  check_residue "$HOME/hermes-aionui" "AionUi source"
+  check_residue "$HOME/.hermes-setup" "Setup metadata"
+  check_residue "$HOME/.local/bin/hermes" "Hermes symlink"
+  check_residue "$HOME/.config/AionUi" "AionUi runtime data"
+  check_residue "$HOME/.config/systemd/user/hermes-gateway.service" "Systemd unit (hermes)"
+  check_residue "$HOME/.config/systemd/user/aionui-webui.service" "Systemd unit (aionui)"
 
-if $D ps -a --format '{{.Names}}' | grep -q '^open-webui$' 2>/dev/null; then
-  warn "  LEFTOVER: Open WebUI container"
-  RESIDUE=true
+  if $D ps -a --format '{{.Names}}' | grep -q '^open-webui$' 2>/dev/null; then
+    warn "  LEFTOVER: Open WebUI container"
+    RESIDUE=true
+  fi
+else
+  info "Data preserved — skipping residue check for data paths."
+  RESIDUE=false
 fi
 
 if [[ "$RESIDUE" == "false" ]]; then
-  info "Zero residue — no Hermes Stack files remain on this system."
+  info "Clean uninstall — no Hermes Stack residue found."
 fi
 
 echo ""
