@@ -137,9 +137,9 @@ if [[ "$DELETE_DATA" == "true" ]]; then
   done
 
   # Remove Docker images (match by prefix so version bumps don't orphan them)
-  $D images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep -E 'ghcr\.io/(anomalyco/hermes-agent|open-webui/open-webui)|hermes-setup-aionui' | while read -r img; do
+  while IFS= read -r img; do
     $D rmi "$img" 2>/dev/null || true
-  done
+  done < <($D images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep -E 'ghcr\.io/(anomalyco/hermes-agent|open-webui/open-webui)|hermes-setup-aionui' || true)
 
   # Hermes config
   if [[ -d "$HOME/.hermes" ]]; then
