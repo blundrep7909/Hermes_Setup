@@ -368,6 +368,9 @@ start_openwebui_container() {
   done
   echo "" # to end the line of dots
 
+  info "Pulling Open WebUI image ($OPENWEBUI_IMAGE)..."
+  $D pull "$OPENWEBUI_IMAGE" 2>&1 || true
+
   info "Starting Open WebUI container..."
   local started=false
   for attempt in $(seq 1 10); do
