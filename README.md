@@ -23,6 +23,8 @@ Start here. Then read these files in order for full session context:
 git clone --depth=1 https://github.com/blundrep7909/Hermes_Setup.git ~/Hermes_Setup && bash ~/Hermes_Setup/installers/host.sh
 ```
 
+**Docker is auto-installed** if not found (Ubuntu/Debian, Fedora, Arch, SUSE supported).
+
 **What you get:**
 - **Hermes Agent** — installed in Python venv at `~/.hermes-venv/`, auto-started via systemd (or nohup)
 - **AionUi** — cloned + built at `~/hermes-aionui/`, auto-started via systemd (or nohup)
@@ -34,6 +36,8 @@ git clone --depth=1 https://github.com/blundrep7909/Hermes_Setup.git ~/Hermes_Se
 ```bash
 git clone --depth=1 https://github.com/blundrep7909/Hermes_Setup.git ~/Hermes_Setup && bash ~/Hermes_Setup/installers/docker.sh
 ```
+
+**Docker is auto-installed** if not found.
 
 > 📁 The cloned repo at `~/Hermes_Setup/` is used for management commands:
 > `bash ~/Hermes_Setup/scripts/doctor.sh`, `uninstall.sh`, `update.sh`, `backup.sh`.

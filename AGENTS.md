@@ -14,8 +14,9 @@ no DB queries. Safe to use as Docker healthcheck. Hermes healthcheck MUST includ
 Bearer auth header.
 
 ## WSL2 Docker Caveats
-- Docker works only via `sudo -u gomugatling docker` (user not in docker group)
-- `sudo -n` fails (no NOPASSWD), `check_docker()` falls through to `sudo -u $USER`
+- Docker is auto-installed by the installer if missing (uses apt for Debian/Ubuntu, dnf for Fedora, etc.)
+- User is automatically added to the `docker` group, so `sudo` is not needed for Docker commands
+- If the current shell doesn't pick up the new group, `newgrp docker` or re-login
 - Port 3000 `ss`/`lsof` shows NO process in WSL2 because docker-proxy runs in a separate network namespace in the Docker VM (not visible from the WSL2 Linux side)
 - The ONLY reliable way to check if Docker can bind port 3000 is a Docker canary: `$D run --rm -p 3000:8080 alpine:3.19 true`
 - docker-proxy may take 60-120 seconds to release port after container removal (kernel-level TCP TIME_WAIT that's invisible from WSL2 side)
@@ -45,14 +46,9 @@ Bearer auth header.
 - Do NOT send prompt UI text to stdout when using `$()` for value capture
 
 ## Special Environment
-- **User**: gomugatling
-- **Sudo password**: rasah
-- **Docker**: `sudo -u gomugatling docker` (user not in docker group)
 - **Platform**: WSL2 on Ubuntu
 - **OS**: ubuntu
-- **Docker version**: 29.1.3
-- **Python**: 3.14.4
-- **Hermes agent**: v0.14.0
+- **Docker**: Auto-installed by installer, user added to docker group
 - **GitHub**: https://github.com/blundrep7909/Hermes_Setup
 
 ## Verification
@@ -79,7 +75,6 @@ sudo service docker restart
 - Port 3000 docker-proxy can't be detected via `ss`/`lsof` in WSL2 (Docker VM namespace)
 - Long wait (up to 120s) for stale docker-proxy to release port 3000 after container removal
 - AionUi WebUI times out during keytar rebuild (mitigated by libsecret-1-dev, but postinstall may still log warnings)
-- `sudo -u gomugatling` bypass needed for every Docker command (user not in docker group)
 
 ## Key Fixes Referenced in VERSION.md
 See [VERSION.md](./VERSION.md) for the full changelog. Key fixes this session:

@@ -27,8 +27,6 @@ echo ""
 
 validate_home
 
-validate_home
-
 # ─── OS / Docker detection (before port check — $D must be correct) ────
 OS="$(detect_os)"
 WSL="$(detect_wsl)"
@@ -37,7 +35,7 @@ info "OS: $OS | Platform: $WSL"
 if [[ "$WSL" == "wsl2" ]]; then
   warn "WSL2 detected."
   warn "  Hermes + AionUi will run natively in WSL2."
-  warn "  Open WebUI will run in Docker. Make sure Docker Desktop WSL2 backend is enabled."
+  warn "  Open WebUI will run in Docker (auto-installed if missing)."
 fi
 
 check_docker
@@ -136,6 +134,17 @@ if [[ -z "$PYTHON" ]]; then
 fi
 info "Using Python: $($PYTHON --version)"
 
+# ─── Ensure python3-venv is available ────────────────────────────────
+PYTHON_VERSION="$($PYTHON -c "import sys; print(f'python{sys.version_info.major}.{sys.version_info.minor}')")"
+if ! "$PYTHON" -c "import ensurepip" &>/dev/null; then
+  info "python3-venv not found — installing ${PYTHON_VERSION}-venv..."
+  sudo apt-get install -y -qq "${PYTHON_VERSION}-venv" 2>/dev/null || {
+    error "Failed to install ${PYTHON_VERSION}-venv. Install manually: sudo apt-get install ${PYTHON_VERSION}-venv"
+    exit 1
+  }
+  info "${PYTHON_VERSION}-venv installed."
+fi
+
 # ─── Create Hermes venv + install ─────────────────────────────────────
 if [[ "$DO_ROLLBACK" == "true" ]]; then
   rollback_step "venv_created"
@@ -192,7 +201,7 @@ store_mode "host"
 
 # ─── Install system deps for AionUi ─────────────────────────────────
 info "Installing system dependencies for AionUi build..."
-sudo apt-get install -y libsecret-1-dev >/dev/null 2>&1 || true
+sudo apt-get install -y libsecret-1-dev unzip python3 make g++ >/dev/null 2>&1 || true
 
 # ─── Install AionUi Natively ─────────────────────────────────────────
 if [[ "$DO_ROLLBACK" == "true" ]]; then
@@ -223,8 +232,7 @@ if [[ -d "$AIONUI_DIR" ]]; then
     info "Updating AionUi from git..."
     (cd "$AIONUI_DIR" && git pull)
     "$BUN_BIN" install --cwd "$AIONUI_DIR"
-    "$BUN_BIN" run --cwd "$AIONUI_DIR" build:renderer:web
-    "$BUN_BIN" run --cwd "$AIONUI_DIR" build:server
+    "$BUN_BIN" run --cwd "$AIONUI_DIR" package
   else
     info "AionUi directory exists at $AIONUI_DIR"
     if [[ ! -f "$AIONUI_DIR/node_modules/.package-lock.json" ]]; then
@@ -237,10 +245,8 @@ else
   git clone --depth=1 https://github.com/iOfficeAI/AionUi.git "$AIONUI_DIR"
   info "Installing dependencies (this may take a minute)..."
   "$BUN_BIN" install --cwd "$AIONUI_DIR"
-  info "Building AionUi web renderer..."
-  "$BUN_BIN" run --cwd "$AIONUI_DIR" build:renderer:web
-  info "Building AionUi server..."
-  "$BUN_BIN" run --cwd "$AIONUI_DIR" build:server
+  info "Building AionUi..."
+  "$BUN_BIN" run --cwd "$AIONUI_DIR" package
 fi
 
 # ─── Create Start Scripts (fix #8: --replace, fix #19: dynamic bun) ──
@@ -262,7 +268,7 @@ for b in "\$HOME/.bun/bin/bun" "/usr/local/bin/bun" "/opt/homebrew/bin/bun"; do
   [[ -x "\$b" ]] && { BUN_BIN="\$b"; break; }
 done
 [[ -z "\$BUN_BIN" ]] && BUN_BIN="\$HOME/.bun/bin/bun"
-cd "\$HOME/hermes-aionui" && exec "\$BUN_BIN" run server:start:prod
+cd "\$HOME/hermes-aionui" && exec "\$BUN_BIN" run webui:prod
 AIONUI_START_EOF
 chmod +x "$SETUP_DIR/aionui-start.sh"
 

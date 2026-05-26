@@ -83,8 +83,7 @@ if [[ "$MODE" == "host" ]]; then
       git -C "$AIONUI_DIR" pull --ff-only 2>/dev/null || warn "git pull failed, skipping AionUi update"
       info "Rebuilding AionUi..."
       "$BUN_BIN" install --cwd "$AIONUI_DIR"
-      "$BUN_BIN" run --cwd "$AIONUI_DIR" build:renderer:web
-      "$BUN_BIN" run --cwd "$AIONUI_DIR" build:server
+      "$BUN_BIN" run --cwd "$AIONUI_DIR" package
 
       if systemctl --user is-active aionui-webui &>/dev/null 2>&1; then
         info "Restarting AionUi..."

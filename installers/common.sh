@@ -96,13 +96,69 @@ sudo_check() {
 # ─── Docker + Compose Verification ────────────────────────────────────
 D="docker"
 DC="docker compose"
+
+install_docker() {
+  local os
+  os="$(detect_os)"
+
+  info "Installing Docker for OS: $os..."
+
+  case "$os" in
+    ubuntu|debian|linuxmint|pop|elementary|zorin)
+      info "Detected Debian/Ubuntu — installing Docker via apt..."
+      sudo apt-get update -qq
+      sudo apt-get install -y -qq ca-certificates curl gnupg
+      sudo install -m 0755 -d /etc/apt/keyrings
+      curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg 2>/dev/null
+      sudo chmod a+r /etc/apt/keyrings/docker.gpg
+      echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo \"$VERSION_CODENAME\") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+      sudo apt-get update -qq
+      sudo apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+      ;;
+    fedora|centos|rhel|rocky|almalinux)
+      info "Detected RHEL/Fedora — installing Docker via dnf..."
+      sudo dnf -y install dnf-plugins-core
+      sudo dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo
+      sudo dnf -y install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+      ;;
+    arch|manjaro|endeavouros)
+      info "Detected Arch — installing Docker via pacman..."
+      sudo pacman -Sy --noconfirm docker docker-compose
+      ;;
+    opensuse*|suse)
+      info "Detected SUSE — installing Docker via zypper..."
+      sudo zypper -n install docker docker-compose
+      ;;
+    *)
+      info "Using Docker official convenience script..."
+      curl -fsSL https://get.docker.com | sudo sh
+      ;;
+  esac
+
+  sudo groupadd -f docker 2>/dev/null || true
+  sudo usermod -aG docker "$(whoami)" 2>/dev/null || true
+
+  if command -v systemctl &>/dev/null; then
+    sudo systemctl enable docker 2>/dev/null || true
+    sudo systemctl start docker 2>/dev/null || true
+  elif command -v service &>/dev/null; then
+    sudo service docker start 2>/dev/null || true
+  fi
+
+  info "Docker installed."
+}
+
 check_docker() {
   if ! command -v docker &>/dev/null; then
-    error "Docker not found. Install Docker first: https://docs.docker.com/engine/install/"
+    info "Docker not found — installing automatically..."
+    install_docker
+  fi
+
+  if ! command -v docker &>/dev/null; then
+    error "Docker installation failed. Install manually: https://docs.docker.com/engine/install/"
     exit 1
   fi
 
-  # Check if user needs sudo for docker commands
   if ! docker info &>/dev/null; then
     local user="$(whoami)"
     if sudo -u "$user" docker info &>/dev/null 2>&1; then
@@ -115,8 +171,7 @@ check_docker() {
       warn "Permission denied — using sudo -n for docker commands"
     else
       error "Docker daemon is not running or permission denied."
-      error "  Add yourself to the docker group: sudo usermod -aG docker $USER && newgrp docker"
-      error "  Then start Docker: sudo systemctl start docker"
+      error "  Try: newgrp docker || sudo service docker start || sudo systemctl start docker"
       exit 1
     fi
   fi
@@ -128,7 +183,6 @@ check_docker() {
   info "Docker $($D --version | cut -d' ' -f3 | tr -d ',')"
   info "Compose $($DC version | cut -d' ' -f4)"
 
-  # Check if host-gateway is supported (Docker >= 20.10)
   if ! $D info --format '{{.ServerVersion}}' 2>/dev/null | grep -q '^2[0-9]\.'; then
     warn "Docker < 20.10 detected — host.docker.internal may not resolve automatically"
   fi
