@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-COMPOSE_FILE="$PROJECT_DIR/compose/docker-compose.yml"
+SRC="${BASH_SOURCE[0]:-}"
+if [[ -n "$SRC" ]]; then
+  SCRIPT_DIR="$(cd "$(dirname "$SRC")" && pwd)"
+  PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+else
+  SCRIPT_DIR=""; PROJECT_DIR=""
+fi
+COMPOSE_FILE="${PROJECT_DIR:-$HOME/Hermes_Setup}/compose/docker-compose.yml"
 SETUP_DIR="${SETUP_DIR:-$HOME/.hermes-setup}"
 STATE_FILE="$SETUP_DIR/state"
 
@@ -245,7 +250,14 @@ if [[ "$RESIDUE" == "false" ]]; then
 fi
 
 # ─── Repo self-removal ────────────────────────────────────────────
-REPO_DIR="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PROJECT_DIR")"
+REPO_DIR="$(git rev-parse --show-toplevel 2>/dev/null || echo "")"
+if [[ -z "$REPO_DIR" || ! -d "$REPO_DIR" ]]; then
+  for candidate in "$HOME/Hermes_Setup" "$HOME/hermes-setup"; do
+    if [[ -d "$candidate" && -f "$candidate/scripts/uninstall.sh" ]]; then
+      REPO_DIR="$candidate"; break
+    fi
+  done
+fi
 if [[ -d "$REPO_DIR" ]]; then
   if [[ "$FORCE" == "true" ]]; then
     rm -rf "$REPO_DIR"
