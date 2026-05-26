@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SRC="${BASH_SOURCE[0]:-}"
-if [[ -n "$SRC" ]]; then
-  SCRIPT_DIR="$(cd "$(dirname "$SRC")" && pwd)"
+set +u; _bs="${BASH_SOURCE[0]}"; set -u
+if [[ -n "$_bs" ]]; then
+  SCRIPT_DIR="$(cd "$(dirname "$_bs")" && pwd)"
   PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 else
   SCRIPT_DIR=""; PROJECT_DIR=""
