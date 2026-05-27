@@ -237,7 +237,8 @@ if [[ -d "$AIONUI_DIR" ]]; then
   if [[ "$FORCE_UPGRADE" == "true" ]]; then
     info "Updating AionUi from git..."
     (cd "$AIONUI_DIR" && git pull)
-    "$BUN_BIN" install --cwd "$AIONUI_DIR"
+    "$BUN_BIN" install --cwd "$AIONUI_DIR" --ignore-scripts || true
+    npm install --prefix "$AIONUI_DIR" better-sqlite3 2>/dev/null || warn "better-sqlite3 install failed — AionUi DB features may be limited"
     info "Downloading aioncore backend binary..."
     (cd "$AIONUI_DIR" && node scripts/prepareAioncore.js) || warn "aioncore download failed — AionUi WebUI may not start"
     "$BUN_BIN" run --cwd "$AIONUI_DIR" package
@@ -245,14 +246,17 @@ if [[ -d "$AIONUI_DIR" ]]; then
     info "AionUi directory exists at $AIONUI_DIR"
     if [[ ! -f "$AIONUI_DIR/node_modules/.package-lock.json" ]]; then
       info "Dependencies not installed — running bun install..."
-      "$BUN_BIN" install --cwd "$AIONUI_DIR"
+      "$BUN_BIN" install --cwd "$AIONUI_DIR" --ignore-scripts || true
+      npm install --prefix "$AIONUI_DIR" better-sqlite3 2>/dev/null || warn "better-sqlite3 install failed — AionUi DB features may be limited"
     fi
   fi
 else
   info "Cloning AionUi to $AIONUI_DIR..."
   git clone --depth=1 https://github.com/iOfficeAI/AionUi.git "$AIONUI_DIR"
   info "Installing dependencies (this may take a minute)..."
-  "$BUN_BIN" install --cwd "$AIONUI_DIR"
+  "$BUN_BIN" install --cwd "$AIONUI_DIR" --ignore-scripts || true
+  info "Installing better-sqlite3 via npm (native addon — Bun doesn't support it)..."
+  npm install --prefix "$AIONUI_DIR" better-sqlite3 2>/dev/null || warn "better-sqlite3 install failed — AionUi DB features may be limited"
   info "Downloading aioncore backend binary..."
   (cd "$AIONUI_DIR" && node scripts/prepareAioncore.js) || warn "aioncore download failed — AionUi WebUI may not start"
   info "Building AionUi..."
