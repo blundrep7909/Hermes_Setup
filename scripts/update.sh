@@ -83,7 +83,6 @@ if [[ "$MODE" == "host" ]]; then
       git -C "$AIONUI_DIR" pull --ff-only 2>/dev/null || warn "git pull failed, skipping AionUi update"
       info "Rebuilding AionUi..."
       "$BUN_BIN" install --cwd "$AIONUI_DIR" --ignore-scripts || true
-      npm install --prefix "$AIONUI_DIR" better-sqlite3 2>/dev/null || warn "better-sqlite3 install failed — AionUi DB features may be limited"
       info "Downloading aioncore backend binary..."
       (cd "$AIONUI_DIR" && node scripts/prepareAioncore.js) || warn "aioncore download failed — AionUi WebUI may not start"
       "$BUN_BIN" run --cwd "$AIONUI_DIR" package
