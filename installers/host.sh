@@ -435,6 +435,24 @@ for rc_file in "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.profile"; do
   fi
 done
 
+# ─── Retrieve AionUi admin credentials ────────────────────────────
+AIONUI_ADMIN_USER="admin"
+AIONUI_ADMIN_PASS=""
+if command -v ss &>/dev/null; then
+  for i in $(seq 1 10); do
+    AIONCORE_PORT=$(ss -tlnp 2>/dev/null | grep aioncore | head -1 | awk '{print $4}' | rev | cut -d: -f1 | rev)
+    if [[ -n "$AIONCORE_PORT" ]]; then
+      sleep 2
+      AIONUI_ADMIN_PASS=$(curl -sf -X POST "http://127.0.0.1:${AIONCORE_PORT}/api/webui/reset-password" 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('data',{}).get('new_password',''))" 2>/dev/null)
+      if [[ -n "$AIONUI_ADMIN_PASS" ]]; then
+        info "AionUi admin credentials retrieved"
+        break
+      fi
+    fi
+    sleep 3
+  done
+fi
+
 # ─── Summary (fix #18: explain ACP native advantage) ──────────────────
 trap - EXIT
 echo ""
@@ -450,6 +468,15 @@ echo ""
 echo "  Hermes API:   http://localhost:8642/v1"
 echo "  Open WebUI:   http://localhost:3000"
 echo "  AionUi WebUI: http://localhost:3001"
+if [[ -n "$AIONUI_ADMIN_PASS" ]]; then
+  echo ""
+  echo "  ┌─────────────────────────────────────────────────────┐"
+  echo "  │  AionUi Login                                       │"
+  echo "  │  Username: $AIONUI_ADMIN_USER                       │"
+  echo "  │  Password: $AIONUI_ADMIN_PASS                       │"
+  echo "  │  (change after first login)                         │"
+  echo "  └─────────────────────────────────────────────────────┘"
+fi
 echo ""
 echo "  ✅ ACP agents run natively on the host"
 echo "     └── Full access to: host filesystem, processes, network"

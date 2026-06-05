@@ -1,6 +1,13 @@
 ## 2026-06-05 — v1.2.0
 
 Bun/Node.js compatibility fixes for non-interactive and WSL2 environments.
+Installation summary now shows AionUi admin credentials.
+
+### Added
+- **AionUi admin credentials displayed in install summary**:
+  After installation, the script retrieves the AionUi admin username and password
+  from the aioncore API and shows them in a box at the end of the output.
+  Password is generated fresh via reset-password API.
 
 ### Fixed
 - **`node scripts/prepareAioncore.js` replaced with `"$BUN_BIN" scripts/prepareAioncore.js`**:
