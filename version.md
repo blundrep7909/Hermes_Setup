@@ -18,6 +18,10 @@ Installation summary now shows AionUi admin credentials.
   The generated start script was missing the `command -v bun` fallback that exists in the main installer.
 - **python3-venv install now tries `apt-get install` without sudo as fallback**:
   In non-interactive mode or WSL2, `sudo` may hang. The installer now falls back to non-sudo `apt-get`, then provides clear manual instructions.
+- **`API_SERVER_HOST=0.0.0.0` added to `.env`**:
+  The Hermes API server defaults to binding on `127.0.0.1:8642`, which is inaccessible from Docker containers.
+  Adding `API_SERVER_HOST=0.0.0.0` makes the gateway bind on all interfaces, allowing
+  Open WebUI (and other Docker containers) to reach the Hermes API via the WSL2 IP address.
 
 ---
 
