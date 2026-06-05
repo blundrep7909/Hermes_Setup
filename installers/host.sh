@@ -88,6 +88,7 @@ if [[ "$INSTALL_MODE" != "update" ]]; then
   echo "    • ~/.config/systemd/user/  2 systemd service files (if systemd available)"
   echo "    • ~/.hermes-setup/pids/    PID files for nohup fallback (if systemd unavailable)"
   echo "    • ~/.bashrc / .zshrc       3 lines (PATH + env sourcing)"
+  echo "    • /usr/local/bin/xdg-open   WSL wrapper: opens files via Windows default apps"
   echo "    • Docker volume            1 (open-webui-data)"
   echo ""
   echo "  Total disk: ~3.5GB"
@@ -285,6 +286,31 @@ OPENCODE_PROFILE_EOF
     fi
   else
     warn "OpenCode install failed — skipping. AionUi won't detect opencode."
+  fi
+fi
+
+# ─── WSL Fix: xdg-open → Windows default apps ──────────────────────
+if [[ "$WSL" == "wsl2" ]]; then
+  if [[ "$DO_ROLLBACK" == "true" ]]; then
+    rollback_step "wsl_xdg_open"
+  fi
+  if [[ ! -x /usr/local/bin/xdg-open ]]; then
+    info "Creating WSL xdg-open wrapper (opens files with Windows default apps)..."
+    sudo tee /usr/local/bin/xdg-open > /dev/null << 'XDG_OPEN_WRAPPER'
+#!/bin/bash
+path="$1"
+if [ -z "$path" ]; then exit 1; fi
+winpath=$(wslpath -w "$path" 2>/dev/null)
+if [ $? -eq 0 ] && [ -n "$winpath" ]; then
+  explorer.exe "$winpath"
+else
+  explorer.exe "$path"
+fi
+XDG_OPEN_WRAPPER
+    sudo chmod +x /usr/local/bin/xdg-open
+    info "WSL xdg-open wrapper created at /usr/local/bin/xdg-open"
+  else
+    info "WSL xdg-open wrapper already exists at /usr/local/bin/xdg-open"
   fi
 fi
 

@@ -26,6 +26,12 @@ Installation summary now shows AionUi admin credentials.
   The installer now downloads OpenCode CLI and adds `~/.opencode/bin` to `~/.profile`
   so aioncore can detect it as an ACP agent. OpenCode appears in AionUi's agent list
   with model/mode configuration available in settings.
+- **WSL xdg-open wrapper for Windows default apps**:
+  On WSL2, `xdg-open` (used by aioncore's "Open in system app" feature) only opens files
+  with Linux apps. The installer now creates `/usr/local/bin/xdg-open` that converts Linux
+  paths to Windows paths via `wslpath -w` and opens them with `explorer.exe`, making files
+  open in the correct Windows default application (e.g., browser for HTML, image viewer
+  for PNG, etc.).
 
 ---
 

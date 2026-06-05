@@ -546,6 +546,10 @@ rollback_cleanup() {
           fi
           rm -rf "$HOME/.hermes-setup/pids" 2>/dev/null || true
           ;;
+        "wsl_xdg_open")
+          warn "Rolling back: removing WSL xdg-open wrapper"
+          sudo rm -f /usr/local/bin/xdg-open 2>/dev/null || true
+          ;;
         "venv_created")
           warn "Rolling back: removing Hermes venv"
           rm -rf "$HOME/.hermes-venv" 2>/dev/null || true
