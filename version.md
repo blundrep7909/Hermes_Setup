@@ -1,3 +1,19 @@
+## 2026-06-05 — v1.2.0
+
+Bun/Node.js compatibility fixes for non-interactive and WSL2 environments.
+
+### Fixed
+- **`node scripts/prepareAioncore.js` replaced with `"$BUN_BIN" scripts/prepareAioncore.js`**:
+  Node.js is not guaranteed to be installed. Bun runtime is used instead for downloading the aioncore binary.
+- **`aionui-start.sh` uses `bun run scripts/webui.ts` instead of `cross-env tsx`**:
+  `tsx` (Node.js TypeScript executor) is incompatible with Bun. Bun's native TypeScript support works directly.
+- **`aionui-start.sh` for loop now includes `$(command -v bun 2>/dev/null)` fallback**:
+  The generated start script was missing the `command -v bun` fallback that exists in the main installer.
+- **python3-venv install now tries `apt-get install` without sudo as fallback**:
+  In non-interactive mode or WSL2, `sudo` may hang. The installer now falls back to non-sudo `apt-get`, then provides clear manual instructions.
+
+---
+
 ## 2026-05-24 — v1.1.0
 
 Host-mode port collision fix: AionUi native default port (3000) no longer conflicts with Open WebUI.

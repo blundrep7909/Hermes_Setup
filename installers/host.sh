@@ -142,12 +142,17 @@ info "Using Python: $($PYTHON --version)"
 
 # ─── Ensure python3-venv is available ────────────────────────────────
 PYTHON_VERSION="$($PYTHON -c "import sys; print(f'python{sys.version_info.major}.{sys.version_info.minor}')")"
-if ! "$PYTHON" -c "import ensurepip" &>/dev/null; then
+if ! "$PYTHON" -c "import ensurepip" &>/dev/null && [[ ! -f "$HOME/.hermes-venv/bin/pip" ]]; then
   info "python3-venv not found — installing ${PYTHON_VERSION}-venv..."
-  sudo apt-get install -y -qq "${PYTHON_VERSION}-venv" 2>/dev/null || {
-    error "Failed to install ${PYTHON_VERSION}-venv. Install manually: sudo apt-get install ${PYTHON_VERSION}-venv"
-    exit 1
-  }
+  if ! sudo apt-get install -y -qq "${PYTHON_VERSION}-venv" 2>/dev/null; then
+    if ! apt-get install -y -qq "${PYTHON_VERSION}-venv" 2>/dev/null; then
+      warn "apt-get failed — try installing manually:"
+      warn "  sudo apt-get install ${PYTHON_VERSION}-venv"
+      warn "  (WSL: wsl -u root apt-get install ${PYTHON_VERSION}-venv)"
+      error "Cannot proceed without python3-venv. Install it and re-run."
+      exit 1
+    fi
+  fi
   info "${PYTHON_VERSION}-venv installed."
 fi
 
@@ -239,7 +244,7 @@ if [[ -d "$AIONUI_DIR" ]]; then
     (cd "$AIONUI_DIR" && git pull)
     "$BUN_BIN" install --cwd "$AIONUI_DIR" --ignore-scripts || true
     info "Downloading aioncore backend binary..."
-    (cd "$AIONUI_DIR" && node scripts/prepareAioncore.js) || warn "aioncore download failed — AionUi WebUI may not start"
+    (cd "$AIONUI_DIR" && "$BUN_BIN" scripts/prepareAioncore.js) || warn "aioncore download failed — AionUi WebUI may not start"
     "$BUN_BIN" run --cwd "$AIONUI_DIR" package
   else
     info "AionUi directory exists at $AIONUI_DIR"
@@ -255,7 +260,7 @@ else
   "$BUN_BIN" install --cwd "$AIONUI_DIR" --ignore-scripts || true
   warn "better-sqlite3 skipped (native addon — not supported in Bun). AionUi should still work."
   info "Downloading aioncore backend binary..."
-  (cd "$AIONUI_DIR" && node scripts/prepareAioncore.js) || warn "aioncore download failed — AionUi WebUI may not start"
+  (cd "$AIONUI_DIR" && "$BUN_BIN" scripts/prepareAioncore.js) || warn "aioncore download failed — AionUi WebUI may not start"
   info "Building AionUi..."
   "$BUN_BIN" run --cwd "$AIONUI_DIR" package
 fi
@@ -275,11 +280,11 @@ cat > "$SETUP_DIR/aionui-start.sh" << AIONUI_START_EOF
 #!/usr/bin/env bash
 export PATH="\$HOME/.bun/bin:\$PATH"
 BUN_BIN=""
-for b in "\$HOME/.bun/bin/bun" "/usr/local/bin/bun" "/opt/homebrew/bin/bun"; do
+for b in "\$HOME/.bun/bin/bun" "/usr/local/bin/bun" "/opt/homebrew/bin/bun" "$(command -v bun 2>/dev/null)"; do
   [[ -x "\$b" ]] && { BUN_BIN="\$b"; break; }
 done
 [[ -z "\$BUN_BIN" ]] && BUN_BIN="\$HOME/.bun/bin/bun"
-cd "\$HOME/hermes-aionui" && exec env AIONUI_PORT=3001 "\$BUN_BIN" run webui:prod
+cd "\$HOME/hermes-aionui" && exec env AIONUI_PORT=3001 NODE_ENV=production "\$BUN_BIN" run scripts/webui.ts
 AIONUI_START_EOF
 chmod +x "$SETUP_DIR/aionui-start.sh"
 
