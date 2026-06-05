@@ -22,6 +22,10 @@ Installation summary now shows AionUi admin credentials.
   The Hermes API server defaults to binding on `127.0.0.1:8642`, which is inaccessible from Docker containers.
   Adding `API_SERVER_HOST=0.0.0.0` makes the gateway bind on all interfaces, allowing
   Open WebUI (and other Docker containers) to reach the Hermes API via the WSL2 IP address.
+- **OpenCode CLI installed and registered**:
+  The installer now downloads OpenCode CLI and adds `~/.opencode/bin` to `~/.profile`
+  so aioncore can detect it as an ACP agent. OpenCode appears in AionUi's agent list
+  with model/mode configuration available in settings.
 
 ---
 

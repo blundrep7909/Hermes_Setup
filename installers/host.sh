@@ -265,6 +265,29 @@ else
   "$BUN_BIN" run --cwd "$AIONUI_DIR" package
 fi
 
+# ─── Install OpenCode CLI (ACP agent for AionUi) ─────────────────────
+rollback_step "opencode"
+if command -v opencode &>/dev/null; then
+  info "OpenCode already installed at $(command -v opencode)"
+else
+  info "Installing OpenCode CLI..."
+  if curl -fsSL https://opencode.ai/install | bash; then
+    info "OpenCode installed."
+    # Ensure opencode is on PATH in .profile (not just .bashrc) for
+    # non-interactive shells (AionUi aioncore spawns agents via login shell).
+    if ! grep -q 'opencode/bin' "$HOME/.profile" 2>/dev/null; then
+      cat >> "$HOME/.profile" << 'OPENCODE_PROFILE_EOF'
+
+# opencode
+export PATH="$HOME/.opencode/bin:$PATH"
+OPENCODE_PROFILE_EOF
+      info "Added opencode PATH to ~/.profile"
+    fi
+  else
+    warn "OpenCode install failed — skipping. AionUi won't detect opencode."
+  fi
+fi
+
 # ─── Create Start Scripts (fix #8: --replace, fix #19: dynamic bun) ──
 rollback_step "start_scripts"
 mkdir -p "$SETUP_DIR"
