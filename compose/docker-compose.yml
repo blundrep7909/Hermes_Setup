@@ -1,6 +1,9 @@
 services:
   hermes:
-    image: ghcr.io/anomalyco/hermes-agent:0.14.11
+    build:
+      context: ../docker
+      dockerfile: hermes.Dockerfile
+    image: hermes-setup-hermes:latest
     container_name: hermes
     restart: unless-stopped
     ports:
@@ -39,7 +42,7 @@ services:
 
   aionui:
     build:
-      context: ./docker
+      context: ../docker
       dockerfile: aionui.Dockerfile
     container_name: aionui
     restart: unless-stopped
@@ -57,6 +60,23 @@ services:
       timeout: 5s
       retries: 3
       start_period: 30s
+
+  9router:
+    image: decolua/9router:latest
+    container_name: 9router
+    restart: unless-stopped
+    ports:
+      - "20128:20128"
+    volumes:
+      - ~/.9router:/app/data
+    environment:
+      - DATA_DIR=/app/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:20128/health >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
 
 volumes:
   open-webui-data:

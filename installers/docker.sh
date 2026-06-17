@@ -48,6 +48,14 @@ check_docker
 # ─── Pre-flight port check (BEFORE rollback — fail cleanly, no rollback)
 preflight_port_check
 
+# ─── 9Router port check ──────────────────────────────────────────────
+info "Checking port 20128 (9Router)..."
+if timeout 2 bash -c "echo > /dev/tcp/0.0.0.0/20128" 2>/dev/null; then
+  error "Port 20128 (9Router) already in use"
+  exit 1
+fi
+info "Port 20128 (9Router): available"
+
 # ─── Detect existing installation → prompt mode ────────────────────────
 EXISTING=$(detect_existing_installation)
 DO_ROLLBACK=true
@@ -113,9 +121,30 @@ else
     rollback_step "compose_up"
   fi
 fi
-info "Starting all containers (Hermes + Open WebUI + AionUi)..."
+info "Starting all containers (Hermes + Open WebUI + AionUi + 9Router)..."
 export API_SERVER_KEY
 $DC -f "$COMPOSE_DIR/docker-compose.yml" up -d
+
+# ─── Install OpenCode CLI (ACP agent for AionUi) ─────────────────────
+rollback_step "opencode"
+if command -v opencode &>/dev/null; then
+  info "OpenCode already installed at $(command -v opencode)"
+else
+  info "Installing OpenCode CLI..."
+  if curl -fsSL https://opencode.ai/install | bash; then
+    info "OpenCode installed."
+    if ! grep -q 'opencode/bin' "$HOME/.profile" 2>/dev/null; then
+      cat >> "$HOME/.profile" << 'OPENCODE_PROFILE_EOF'
+
+# opencode
+export PATH="$HOME/.opencode/bin:$PATH"
+OPENCODE_PROFILE_EOF
+      info "Added opencode PATH to ~/.profile"
+    fi
+  else
+    warn "OpenCode install failed — skipping. AionUi won't detect opencode."
+  fi
+fi
 
 # ─── Verification ─────────────────────────────────────────────────────
 rollback_step "verify"
@@ -127,6 +156,16 @@ for i in $(seq 1 12); do
     break
   fi
   sleep 5
+done
+
+# ─── 9Router readiness ──────────────────────────────────────────────
+info "Waiting for 9Router to be ready..."
+for i in $(seq 1 6); do
+  if curl -sf http://localhost:20128/health >/dev/null 2>&1; then
+    info "9Router ready (attempt $i)"
+    break
+  fi
+  sleep 3
 done
 
 info "Running post-install verification..."
@@ -148,10 +187,14 @@ fi
 echo "  Hermes API:   http://localhost:8642/v1"
 echo "  Open WebUI:   http://localhost:3000"
 echo "  AionUi:       http://localhost:3001"
+echo "  9Router:      http://localhost:20128"
 echo ""
 echo "  To configure providers:"
 echo "    docker exec -it hermes /opt/hermes/.venv/bin/hermes setup"
 echo ""
+echo "  To configure 9Router:"
+echo "    Open http://localhost:20128/dashboard in your browser"
+echo ""
 echo "  To view logs: docker compose -f $COMPOSE_DIR/docker-compose.yml logs -f"
-  echo "  To recheck:   bash $DOCTOR_SCRIPT"
+echo "  To recheck:   bash $DOCTOR_SCRIPT"
 echo ""
